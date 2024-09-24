@@ -1,43 +1,15 @@
-# text tools
-
-import re
 import json
-from bs4 import BeautifulSoup, Comment
 from textual.app import App
 from textual.reactive import reactive
 from textual.widgets import Static, Header
 from textual.containers import VerticalScroll
 
 ##
-## text tools
+## widgets
 ##
-
-strip_tags = ['script', 'style', 'meta', 'link', 'noscript', 'nav', 'img', 'ol', 'ul']
-
-def prune_html(path):
-    # load html source
-    with open(path, 'r') as fid:
-        soup = BeautifulSoup(fid, 'html.parser')
-
-    # filter out comments
-    for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
-        comment.extract()
-
-    # filter out tags
-    for tag in strip_tags:
-        for source in soup.find_all(tag):
-            source.decompose()
-
-    # compress whitespace
-    source = str(soup)
-    return re.sub(r'\n+', '\n', source).strip()
 
 def T(t, c):
     return f'[{c}]{t}[/{c}]'
-
-##
-## widgets
-##
 
 class LangRow(Static):
     state = reactive(0)
@@ -79,7 +51,7 @@ class LangPane(VerticalScroll, inherit_bindings=False):
                 row.state = 2
 
 ##
-## main app
+## tutor app
 ##
 
 class Tutor(App):
