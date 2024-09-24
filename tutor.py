@@ -5,7 +5,7 @@ import json
 from bs4 import BeautifulSoup, Comment
 from textual.app import App
 from textual.reactive import reactive
-from textual.widgets import Input, Static
+from textual.widgets import Static, Header
 from textual.containers import VerticalScroll
 
 ##
@@ -39,57 +39,52 @@ def T(t, c):
 ## widgets
 ##
 
-class BarePrompt(Input):
-    def __init__(self, height, **kwargs):
+class LangRow(Static):
+    state = reactive(0)
+
+    def __init__(self, orig, trans, **kwargs):
         super().__init__(**kwargs)
-        self.styles.border = ('none', None)
-        self.styles.padding = (0, 1)
-        self.styles.height = height
+        self.styles.margin = (0, 0, 1, 0)
+        self.orig = orig
+        self.trans = trans
 
-    def on_key(self, event):
-        if event.key in ('up', 'down', 'pgup', 'pgdown'):
-            event.prevent_default()
+    def watch_state(self):
+        if self.state == 0:
+            self.update(T(self.orig, 'bold') + '\n' + self.trans)
+        elif self.state == 1:
+            self.update(T(self.orig, 'bold #ff0d57') + '\n' + T(self.trans, 'blue'))
+        else:
+            self.update(self.orig + '\n' + T(self.trans, 'gray15 on gray15'))
 
-class UrlInput(Static):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.border_title = 'url'
-        self.styles.border = ('round', 'white')
-
-    def compose(self):
-        yield BarePrompt(id='prompt', height=1, placeholder='Enter an article URL...')
-
-class LangPane(Static):
+class LangPane(VerticalScroll, inherit_bindings=False):
     position = reactive(0)
 
     def __init__(self, texts, **kwargs):
         super().__init__(**kwargs)
-        self.styles.border_title = 'text'
-        self.styles.border = ('round', 'white')
+        self.styles.margin = 1
         self.texts = texts
 
-    def watch_position(self):
-        text = []
+    def compose(self):
         for i, (orig, trans) in enumerate(self.texts):
-            if i < self.position - 1:
-                s = T(orig, 'bold') + '\n' + trans
-            elif i == self.position - 1:
-                s = T(orig, 'bold #ff0d57') + '\n' + T(trans, 'blue')
-            else:
-                s = orig
-            text.append(s)
-        self.update('\n\n'.join(text))
+            yield LangRow(orig, trans)
 
-class LangScroll(VerticalScroll):
-    def on_key(self, event):
-        if event.key in ('up', 'down'):
-            event.prevent_default()
+    def watch_position(self):
+        for i, row in enumerate(self.query(LangRow)):
+            if i < self.position - 1:
+                row.state = 0
+            elif i == self.position - 1:
+                row.state = 1
+                row.scroll_visible()
+            else:
+                row.state = 2
 
 ##
 ## main app
 ##
 
 class Tutor(App):
+    TITLE = 'LangTutor'
+
     CSS = """
     #prompt {
         background: $surface;
@@ -97,8 +92,10 @@ class Tutor(App):
     """
 
     BINDINGS = [
-        ('u', 'up'  , 'Advance one sentence'),
-        ('d', 'down', 'Go back one sentence'),
+        ('up'      , 'up'      , 'Advance one sentence'),
+        ('down'    , 'down'    , 'Go back one sentence'),
+        ('pageup'  , 'pageup'  , 'Advance one page'    ),
+        ('pagedown', 'pagedown', 'Go back one page'    ),
     ]
 
     def __init__(self, texts):
@@ -107,14 +104,8 @@ class Tutor(App):
         self.texts = texts
 
     def compose(self):
-        # yield UrlInput()
-        yield LangScroll(LangPane(self.texts))
-
-    def on_key(self, event):
-        if event.key == 'up':
-            self.action_up()
-        elif event.key == 'down':
-            self.action_down()
+        yield Header()
+        yield LangPane(self.texts)
 
     def action_up(self):
         pane = self.query_one(LangPane)
@@ -124,10 +115,17 @@ class Tutor(App):
         pane = self.query_one(LangPane)
         pane.position = min(len(pane.texts) + 1, pane.position + 1)
 
-    # @work(thread=True)
-    # async def pipe_stream(self, stream, setter):
-    #     async for reply in cumcat(stream):
-    #         self.call_from_thread(setter, reply)
+    def action_pageup(self):
+        pane = self.query_one(LangPane)
+        pane.scroll_page_up(force=True)
+
+    def action_pagedown(self):
+        pane = self.query_one(LangPane)
+        pane.scroll_page_down(force=True)
+
+##
+## main entry
+##
 
 def main(path):
     with open(path, 'r') as fid:
