@@ -1,8 +1,11 @@
+import os
 import json
 from textual.app import App
 from textual.reactive import reactive
 from textual.widgets import Static, Header
 from textual.containers import VerticalScroll
+
+from translate import parse_jsonl, translate_url
 
 ##
 ## widgets
@@ -13,6 +16,7 @@ def T(t, c):
 
 class LangRow(Static):
     state = reactive(0)
+    dark = reactive(True)
 
     def __init__(self, orig, trans, **kwargs):
         super().__init__(**kwargs)
@@ -20,13 +24,14 @@ class LangRow(Static):
         self.orig = orig
         self.trans = trans
 
-    def watch_state(self):
+    def render(self):
         if self.state == 0:
-            self.update(T(self.orig, 'bold') + '\n' + self.trans)
+            return T(self.orig, 'bold') + '\n' + self.trans
         elif self.state == 1:
-            self.update(T(self.orig, 'bold #ff0d57') + '\n' + T(self.trans, 'blue'))
+            return T(self.orig, 'bold #ff0d57') + '\n' + T(self.trans, 'blue')
         else:
-            self.update(self.orig + '\n' + T(self.trans, 'gray15 on gray15'))
+            block = 'gray15' if self.dark else 'gray89'
+            return self.orig + '\n' + T(self.trans, f'{block} on {block}')
 
 class LangPane(VerticalScroll, inherit_bindings=False):
     position = reactive(0)
@@ -57,12 +62,6 @@ class LangPane(VerticalScroll, inherit_bindings=False):
 class Tutor(App):
     TITLE = 'LangTutor'
 
-    CSS = """
-    #prompt {
-        background: $surface;
-    }
-    """
-
     BINDINGS = [
         ('up'      , 'up'      , 'Advance one sentence'),
         ('down'    , 'down'    , 'Go back one sentence'),
@@ -89,23 +88,44 @@ class Tutor(App):
 
     def action_pageup(self):
         pane = self.query_one(LangPane)
-        pane.scroll_page_up(force=True)
+        pane.scroll_page_up()
 
     def action_pagedown(self):
         pane = self.query_one(LangPane)
-        pane.scroll_page_down(force=True)
+        pane.scroll_page_down()
+
+    def watch_dark(self, dark):
+        for row in self.query(LangRow):
+            row.dark = dark
+        super().watch_dark(dark)
 
 ##
 ## main entry
 ##
 
-def main(path):
-    with open(path, 'r') as fid:
-        texts = [json.loads(line) for line in fid.readlines()]
+def tutor(path, provider='local', save=None):
+    # get file info
+    fname = os.path.basename(path)
+    fbase, fext = os.path.splitext(fname)
+
+    # read file
+    if fext == '.jsonl':
+        with open(path, 'r') as fid:
+            data = fid.read()
+        texts = list(parse_jsonl(data))
+    else:
+        texts = translate_url(path, provider=provider)
+
+    # save file
+    if save is not None:
+        with open(save, 'w') as fid:
+            for row in texts:
+                print(json.dumps(row), file=fid)
+
+    # run app
     app = Tutor(texts)
     app.run()
 
 if __name__ == '__main__':
-    import sys
-    path = sys.argv[1]
-    main(path)
+    import fire
+    fire.Fire(tutor)
