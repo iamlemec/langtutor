@@ -15,12 +15,17 @@ def T(t, c):
     return f'[{c}]{t}[/{c}]'
 
 class LangRow(Static):
+    DEFAULT_CSS = """
+    LangRow {
+        margin: 0 0 1 0;
+    }
+    """
+
     state = reactive(0)
     dark = reactive(True)
 
     def __init__(self, orig, trans, **kwargs):
         super().__init__(**kwargs)
-        self.styles.margin = (0, 0, 1, 0)
         self.orig = orig
         self.trans = trans
 
@@ -34,11 +39,17 @@ class LangRow(Static):
             return self.orig + '\n' + T(self.trans, f'{block} on {block}')
 
 class LangPane(VerticalScroll, inherit_bindings=False):
+    DEFAULT_CSS = """
+    LangPane {
+        margin: 1;
+        scrollbar-size-vertical: 0;
+    }
+    """
+
     position = reactive(0)
 
     def __init__(self, texts, **kwargs):
         super().__init__(**kwargs)
-        self.styles.margin = 1
         self.texts = texts
 
     def compose(self):
@@ -59,7 +70,7 @@ class LangPane(VerticalScroll, inherit_bindings=False):
 ## tutor app
 ##
 
-class Tutor(App):
+class LangTutor(App):
     TITLE = 'LangTutor'
 
     BINDINGS = [
@@ -123,7 +134,7 @@ def tutor(path, provider='local', save=None):
                 print(json.dumps(row), file=fid)
 
     # run app
-    app = Tutor(texts)
+    app = LangTutor(texts)
     app.run()
 
 if __name__ == '__main__':
