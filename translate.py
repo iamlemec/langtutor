@@ -43,10 +43,17 @@ def prune_html(html, strip_tags=STRIP_TAGS):
     return re.sub(r'\n+', '\n', str(soup)).strip()
 
 def extract_text(chat, html, prompt=PROMPT_EXTRACT, max_tokens=4096):
-    return chat(f'{prompt}\n\n{html}', max_tokens=max_tokens)
+    return chat(
+        f'{prompt}\n\n{html}',
+        max_tokens=max_tokens
+    )
 
-def translate_text(chat, text, prompt=PROMPT_TRANSLATE, max_tokens=8192):
-    return chat(f'{prompt}\n\n{text}', prefill='["', max_tokens=max_tokens)
+def translate_text(chat, text, prompt=PROMPT_TRANSLATE, max_tokens=8192, prefill=True):
+    return chat(
+        f'{prompt}\n\n{text}',
+        prefill='["' if prefill else None,
+        max_tokens=max_tokens
+    )
 
 def parse_jsonl(jsonl):
     for line in jsonl.split('\n'):
@@ -57,14 +64,14 @@ def parse_jsonl(jsonl):
 
 def translate_url(
     url, prompt_extract=PROMPT_EXTRACT, prompt_translate=PROMPT_TRANSLATE,
-    provider='local', system=SYSTEM, max_tokens=4096
+    provider='local', model=None, system=SYSTEM, max_tokens=4096, prefill=True
 ):
-    chat = Chat(provider=provider, system=system)
+    chat = Chat(provider=provider, model=model, system=system)
     print(f'Fetching URL')
     html = fetch_url(url)
     prune = prune_html(html)
     print(f'Extracting text')
     text = extract_text(chat, prune, prompt=prompt_extract, max_tokens=max_tokens)
     print(f'Translating text')
-    trans = translate_text(chat, text, prompt=prompt_translate, max_tokens=2*max_tokens)
+    trans = translate_text(chat, text, prompt=prompt_translate, max_tokens=2*max_tokens, prefill=prefill)
     return list(parse_jsonl(trans))

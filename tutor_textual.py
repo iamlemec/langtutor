@@ -114,7 +114,7 @@ class LangTutor(App):
 ## main entry
 ##
 
-def tutor(path, provider='local', save=None):
+def tutor(path, provider='local', model=None, prefill=True, save=None):
     # get file info
     fname = os.path.basename(path)
     fbase, fext = os.path.splitext(fname)
@@ -125,7 +125,7 @@ def tutor(path, provider='local', save=None):
             data = fid.read()
         texts = list(parse_jsonl(data))
     else:
-        texts = translate_url(path, provider=provider)
+        texts = translate_url(path, provider=provider, model=model, prefill=prefill)
 
     # save file
     if save is not None:
