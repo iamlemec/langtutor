@@ -3,9 +3,44 @@ import json
 from textual.app import App
 from textual.reactive import reactive
 from textual.widgets import Static, Header
-from textual.containers import VerticalScroll
+from textual.containers import VerticalScroll, Horizontal, Vertical
+
+from oneping.chat import Chat
+from oneping.chat.textual import ChatWindow
 
 from translate import parse_jsonl, translate_url
+
+##
+## chat prompts
+##
+
+SYSTEM_CHAT = """
+You are a helpful and playful language assistant. The user is currently looking at a side-by-side translation of a news article. Their primary goal is to learn about the language in which the article is written. Answer any questions they have about the text, the translation, or about the original language in which the article is written. Here is the full text and translation of the article provided on a sentence-by-sentence basis:
+
+BEGIN TEXT
+
+{text}
+
+END TEXT
+
+Additionally, each user message will be prefaced by the text of the sentence that the user is currently looking at.
+"""
+
+MESSAGE_CHAT = """
+The user is currently looking at the sentence:
+
+ORIGINAL:
+
+{orig}
+
+TRANSLATION:
+
+{trans}
+
+Now answer the following query from the user:
+
+{query}
+"""
 
 ##
 ## widgets
@@ -80,14 +115,42 @@ class LangTutor(App):
         ('pagedown', 'pagedown', 'Go back one page'    ),
     ]
 
-    def __init__(self, texts):
+    CSS = """
+    LangPane {
+        width: 2fr;
+        margin: 0;
+        border: round white;
+    }
+    ChatWindow {
+        width: 1fr;
+    }
+    ChatHistory {
+        height: auto;
+    }
+    """
+
+    def __init__(self, texts, chat):
         super().__init__()
-        self.styles.height = '1fr'
         self.texts = texts
+        self.chat = chat
 
     def compose(self):
         yield Header()
-        yield LangPane(self.texts)
+        yield Horizontal(
+            LangPane(self.texts),
+            ChatWindow(self.stream),
+        )
+
+    def get_cursor(self):
+        pane = self.query_one(LangPane)
+        row = pane.children[pane.position - 1]
+        return row.orig, row.trans
+
+    async def stream(self, message):
+        orig, trans = self.get_cursor()
+        message = MESSAGE_CHAT.format(orig=orig, trans=trans, query=message)
+        async for chunk in self.chat.stream_async(message):
+            yield chunk
 
     def action_up(self):
         pane = self.query_one(LangPane)
@@ -133,8 +196,13 @@ def tutor(path, provider='local', model=None, prefill=True, save=None):
             for row in texts:
                 print(json.dumps(row), file=fid)
 
+    # make chat instance
+    full_text = '\n\n'.join([f'{orig}\n{trans}' for orig, trans in texts])
+    system = SYSTEM_CHAT.format(text=full_text)
+    chat = Chat(provider=provider, model=model, system=system)
+
     # run app
-    app = LangTutor(texts)
+    app = LangTutor(texts, chat)
     app.run()
 
 if __name__ == '__main__':
