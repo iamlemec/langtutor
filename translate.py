@@ -6,26 +6,31 @@ from bs4 import BeautifulSoup, Comment
 from oneping import Chat
 
 ##
-## constants
+## tools
 ##
 
-STRIP_TAGS = ['script', 'style', 'meta', 'link', 'noscript', 'nav', 'img', 'ol', 'ul']
+def parse_jsonl(jsonl):
+    for line in jsonl.split('\n'):
+        try:
+            yield json.loads(line)
+        except json.JSONDecodeError:
+            continue
 
-SYSTEM = 'You are a helpful assistant that handles html extraction and text translation from news articles in various languages.'
+def load_jsonl(path):
+    with open(path, 'r') as fid:
+        return list(parse_jsonl(fid.read()))
 
-PROMPT_EXTRACT = 'Extract the article title and text from this html file. It is a news article that is likely in a non-English language. Return the result in plain text. Here is the html file:'
-
-PROMPT_TRANSLATE = 'Translate this text into English on a sentence-by-sentence basis. Return the result as a JSONL file where each line is a [original, translated] pair. Here is the text:'
-
-##
-## text tools
-##
+def save_jsonl(path, texts):
+    with open(path, 'w') as fid:
+        for row in texts:
+            print(json.dumps(row), file=fid)
 
 def fetch_url(url):
     response = requests.get(url)
     response.raise_for_status()
     return response.text
 
+STRIP_TAGS = ['script', 'style', 'meta', 'link', 'noscript', 'nav', 'img', 'ol', 'ul']
 def prune_html(html, strip_tags=STRIP_TAGS):
     # load html source
     soup = BeautifulSoup(html, 'html.parser')
@@ -42,6 +47,16 @@ def prune_html(html, strip_tags=STRIP_TAGS):
     # compress whitespace
     return re.sub(r'\n+', '\n', str(soup)).strip()
 
+##
+## translation tools
+##
+
+SYSTEM = 'You are a helpful assistant that handles html extraction and text translation from news articles in various languages.'
+
+PROMPT_EXTRACT = 'Extract the article title and text from this html file. It is a news article that is likely in a non-English language. Return the result in plain text. Here is the html file:'
+
+PROMPT_TRANSLATE = 'Translate this text into English on a sentence-by-sentence basis. Return the result as a JSONL file where each line is a [original, translated] pair. Here is the text:'
+
 def extract_text(chat, html, prompt=PROMPT_EXTRACT, max_tokens=4096):
     return chat(
         f'{prompt}\n\n{html}',
@@ -54,13 +69,6 @@ def translate_text(chat, text, prompt=PROMPT_TRANSLATE, max_tokens=8192, prefill
         prefill='["' if prefill else None,
         max_tokens=max_tokens
     )
-
-def parse_jsonl(jsonl):
-    for line in jsonl.split('\n'):
-        try:
-            yield json.loads(line)
-        except json.JSONDecodeError:
-            continue
 
 def translate_url(
     url, prompt_extract=PROMPT_EXTRACT, prompt_translate=PROMPT_TRANSLATE,
@@ -75,3 +83,45 @@ def translate_url(
     print(f'Translating text')
     trans = translate_text(chat, text, prompt=prompt_translate, max_tokens=2*max_tokens, prefill=prefill)
     return list(parse_jsonl(trans))
+
+##
+## chat tools
+##
+
+SYSTEM_CHAT = """
+You are a helpful and playful language assistant. The user is currently looking at a side-by-side translation of a news article. Their primary goal is to learn about the language in which the article is written. Answer any questions they have about the text, the translation, or about the original language in which the article is written. Here is the full text and translation of the article provided on a sentence-by-sentence basis:
+
+BEGIN TEXT
+
+{text}
+
+END TEXT
+
+Additionally, each user message will be prefaced by the text of the sentence that the user is currently looking at.
+"""
+
+MESSAGE_CHAT = """
+The user is currently looking at the sentence:
+
+ORIGINAL:
+
+{orig}
+
+TRANSLATION:
+
+{trans}
+
+Now answer the following query from the user:
+
+{query}
+"""
+
+def make_chat(texts, provider='local', model=None, system=SYSTEM_CHAT):
+    full_text = '\n\n'.join([f'{orig}\n{trans}' for orig, trans in texts])
+    system = SYSTEM_CHAT.format(text=full_text)
+    return Chat(provider=provider, model=model, system=system)
+
+async def stream_chat(chat, orig, trans, query):
+    message = MESSAGE_CHAT.format(orig=orig, trans=trans, query=query)
+    async for chunk in chat.stream_async(message):
+        yield chunk

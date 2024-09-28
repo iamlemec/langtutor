@@ -1,5 +1,6 @@
+# textual language tutor
+
 import os
-import json
 from textual.app import App
 from textual.reactive import reactive
 from textual.widgets import Static, Header
@@ -8,39 +9,7 @@ from textual.containers import VerticalScroll, Horizontal, Vertical
 from oneping.chat import Chat
 from oneping.chat.textual import ChatWindow
 
-from translate import parse_jsonl, translate_url
-
-##
-## chat prompts
-##
-
-SYSTEM_CHAT = """
-You are a helpful and playful language assistant. The user is currently looking at a side-by-side translation of a news article. Their primary goal is to learn about the language in which the article is written. Answer any questions they have about the text, the translation, or about the original language in which the article is written. Here is the full text and translation of the article provided on a sentence-by-sentence basis:
-
-BEGIN TEXT
-
-{text}
-
-END TEXT
-
-Additionally, each user message will be prefaced by the text of the sentence that the user is currently looking at.
-"""
-
-MESSAGE_CHAT = """
-The user is currently looking at the sentence:
-
-ORIGINAL:
-
-{orig}
-
-TRANSLATION:
-
-{trans}
-
-Now answer the following query from the user:
-
-{query}
-"""
+from translate import load_jsonl, save_jsonl, translate_url, stream_chat, make_chat
 
 ##
 ## widgets
@@ -148,8 +117,7 @@ class LangTutor(App):
 
     async def stream(self, message):
         orig, trans = self.get_cursor()
-        message = MESSAGE_CHAT.format(orig=orig, trans=trans, query=message)
-        async for chunk in self.chat.stream_async(message):
+        async for chunk in stream_chat(self.chat, orig, trans, message):
             yield chunk
 
     def action_up(self):
@@ -184,22 +152,16 @@ def tutor(path, provider='local', model=None, prefill=True, save=None):
 
     # read file
     if fext == '.jsonl':
-        with open(path, 'r') as fid:
-            data = fid.read()
-        texts = list(parse_jsonl(data))
+        texts = load_jsonl(path)
     else:
         texts = translate_url(path, provider=provider, model=model, prefill=prefill)
 
     # save file
     if save is not None:
-        with open(save, 'w') as fid:
-            for row in texts:
-                print(json.dumps(row), file=fid)
+        save_jsonl(save, texts)
 
     # make chat instance
-    full_text = '\n\n'.join([f'{orig}\n{trans}' for orig, trans in texts])
-    system = SYSTEM_CHAT.format(text=full_text)
-    chat = Chat(provider=provider, model=model, system=system)
+    chat = make_chat(texts, provider=provider, model=model)
 
     # run app
     app = LangTutor(texts, chat)
