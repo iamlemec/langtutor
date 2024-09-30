@@ -1,3 +1,4 @@
+import os
 import re
 import json
 import requests
@@ -116,12 +117,53 @@ Now answer the following query from the user:
 {query}
 """
 
-def make_chat(texts, provider='local', model=None, system=SYSTEM_CHAT):
-    full_text = '\n\n'.join([f'{orig}\n{trans}' for orig, trans in texts])
-    system = SYSTEM_CHAT.format(text=full_text)
-    return Chat(provider=provider, model=model, system=system)
+def translate_path(path, provider='local', model=None):
+    # get file info
+    fname = os.path.basename(path)
+    fbase, fext = os.path.splitext(fname)
 
-async def stream_chat(chat, orig, trans, query):
-    message = MESSAGE_CHAT.format(orig=orig, trans=trans, query=query)
-    async for chunk in chat.stream_async(message):
-        yield chunk
+    # read file
+    if fext == '.jsonl':
+        texts = load_jsonl(path)
+    else:
+        texts = translate_url(path, provider=provider, model=model)
+
+    # return texts
+    return texts
+
+class LangChat(Chat):
+    def __init__(self, path=None, provider='local', model=None):
+        super().__init__(provider=provider, model=model)
+        if path is not None:
+            self.set_article(path)
+
+    def set_article(self, path):
+        # get or translate article
+        texts = translate_path(path, provider=self.provider, model=self.model)
+
+        # make system prompt
+        full_text = '\n\n'.join([f'{orig}\n{trans}' for orig, trans in texts])
+        system = SYSTEM_CHAT.format(text=full_text)
+
+        # store text and clear history
+        self.texts = texts
+        self.system = system
+        self.clear()
+
+    async def stream_query(self, orig, trans, query):
+        message = MESSAGE_CHAT.format(orig=orig, trans=trans, query=query)
+        async for chunk in self.stream_async(message):
+            yield chunk
+
+##
+## main
+##
+
+# translate article and save
+def main(path, save, provider='local', model=None):
+    texts = translate_path(path, provider=provider, model=model)
+    save_jsonl(save, texts)
+
+if __name__ == '__main__':
+    import fire
+    fire.Fire(main)

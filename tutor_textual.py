@@ -6,10 +6,8 @@ from textual.reactive import reactive
 from textual.widgets import Static, Header
 from textual.containers import VerticalScroll, Horizontal, Vertical
 
-from oneping.chat import Chat
 from oneping.chat.textual import ChatWindow
-
-from translate import load_jsonl, save_jsonl, translate_url, stream_chat, make_chat
+from translate import LangChat
 
 ##
 ## widgets
@@ -98,15 +96,14 @@ class LangTutor(App):
     }
     """
 
-    def __init__(self, texts, chat):
+    def __init__(self, chat):
         super().__init__()
-        self.texts = texts
         self.chat = chat
 
     def compose(self):
         yield Header()
         yield Horizontal(
-            LangPane(self.texts),
+            LangPane(self.chat.texts),
             ChatWindow(self.stream),
         )
 
@@ -115,9 +112,9 @@ class LangTutor(App):
         row = pane.children[pane.position - 1]
         return row.orig, row.trans
 
-    async def stream(self, message):
+    async def stream(self, query):
         orig, trans = self.get_cursor()
-        async for chunk in stream_chat(self.chat, orig, trans, message):
+        async for chunk in self.chat.stream_query(orig, trans, query):
             yield chunk
 
     def action_up(self):
@@ -146,25 +143,8 @@ class LangTutor(App):
 ##
 
 def tutor(path, provider='local', model=None, prefill=True, save=None):
-    # get file info
-    fname = os.path.basename(path)
-    fbase, fext = os.path.splitext(fname)
-
-    # read file
-    if fext == '.jsonl':
-        texts = load_jsonl(path)
-    else:
-        texts = translate_url(path, provider=provider, model=model, prefill=prefill)
-
-    # save file
-    if save is not None:
-        save_jsonl(save, texts)
-
-    # make chat instance
-    chat = make_chat(texts, provider=provider, model=model)
-
-    # run app
-    app = LangTutor(texts, chat)
+    chat = LangChat(path=path, provider=provider, model=model)
+    app = LangTutor(chat)
     app.run()
 
 if __name__ == '__main__':
