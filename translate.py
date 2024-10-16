@@ -83,6 +83,8 @@ def translate_url(
 ):
     # get cache path
     if cache_dir is not None:
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
         cache_path = os.path.join(cache_dir, url_hash(url))
         if os.path.exists(cache_path):
             with open(cache_path, 'r') as fid:
