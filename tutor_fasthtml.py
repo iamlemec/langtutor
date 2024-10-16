@@ -21,9 +21,9 @@ def UrlInput():
     return Form(hx_post='/article', hx_target='#lang-pane', hx_swap='outerHTML')(url)
 
 def LangRow(orig, trans, cls=''):
-    orig = Div(cls='lang-orig w-full')(Span(orig))
-    trans = Div(cls='lang-trans w-full')(Span(trans))
-    return Div(cls=f'lang-row w-full flex flex-col border rounded-sm p-2 gap-2 {cls}')(orig, trans)
+    orig = Div(cls='lang-orig w-full pl-2 pr-2 border-r border-gray-300')(Span(orig))
+    trans = Div(cls='lang-trans w-full pl-2 pr-2')(Span(trans))
+    return Div(cls=f'lang-row w-full flex flex-row border rounded-sm pt-2 pb-2 {cls}')(orig, trans)
 
 def LangPane(texts=None):
     if texts is None:
@@ -34,9 +34,9 @@ def LangPane(texts=None):
         first, *[LangRow(orig, trans) for orig, trans in texts], last
     )
 
-def LangTutor(provider='local', model=None):
+def LangTutor(cache_dir='cache', **kwargs):
     # make chat interface
-    chat = LangChat(provider=provider, model=model)
+    chat = LangChat(cache_dir=cache_dir, **kwargs)
 
     # create app object
     hdrs = [
@@ -46,11 +46,12 @@ def LangTutor(provider='local', model=None):
     app = FastHTML(hdrs=hdrs, ws_hdr=True, debug=True, live=True)
 
     script_cursor = Script("""
-    function get_cursor() {
+    function get_context() {
+        const query = document.getElementById('query').value;
         const row = document.querySelector('.lang-row.active');
         const orig = row.querySelector('.lang-orig');
         const trans = row.querySelector('.lang-trans');
-        return {orig: orig.textContent, trans: trans.textContent};
+        return {query: query, orig: orig.textContent, trans: trans.textContent};
     }
     document.addEventListener('keydown', (event) => {
         if (event.key === 'ArrowDown') {
@@ -125,7 +126,7 @@ def LangTutor(provider='local', model=None):
         # lang and chat window
         lang = LangPane()
         url = UrlInput()
-        hist = ChatWindow(hx_vals='js:{...get_cursor()}')
+        hist = ChatWindow(hx_vals='js:{...get_context()}')
         trans = Div(id='trans', cls='h-full overflow-y-scroll')(lang)
 
         # panes and body
@@ -145,12 +146,12 @@ def LangTutor(provider='local', model=None):
 
     # connect websocket
     @app.ws('/generate')
-    async def generate(prompt: str, orig: str, trans: str, send):
-        print(f'GENERATE: {prompt}')
+    async def generate(query: str, orig: str, trans: str, send):
+        print(f'QUERY: {query}')
         print(f'ORIG: {orig}')
         print(f'TRANS: {trans}')
-        stream = chat.stream_query(orig, trans, prompt)
-        await websocket(prompt, stream, send)
+        stream = chat.stream_query(orig, trans, query)
+        await websocket(query, stream, send)
         print('\nDONE')
 
     # return
@@ -164,11 +165,11 @@ def LangTutor(provider='local', model=None):
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--provider', type=str, default='local')
-parser.add_argument('--model', type=str, default=None)
+parser.add_argument('--cache_dir', type=str, default='cache')
 parser.add_argument('--host', type=str, default='127.0.0.1')
 parser.add_argument('--port', type=int, default=5000)
 args = parser.parse_args()
 
 # run server
-app = LangTutor(provider=args.provider, model=args.model)
+app = LangTutor(provider=args.provider, cache_dir=args.cache_dir)
 serve(host=args.host, port=args.port)
