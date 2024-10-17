@@ -16,14 +16,16 @@ from translate import LangChat
 def UrlInput():
     url = Input(
         id='url', cls='w-full p-2 font-mono text-sm outline-none bg-inherit',
-        placeholder='Enter a URL', hx_get='/article', name='url'
+        placeholder='Enter a URL', name='url'
     )
     button = Button(
         cls='font-mono text-sm outline-none border-b border-gray-300 rounded bg-blue-500 text-white m-2 pt-1 pb-1 pl-2 pr-2',
-        type='submit'
+        id='translate', type='submit'
     )('Translate')
     outer = Div(cls='flex flex-row relative bg-gray-100 border-b border-gray-300 box-border')(url, button)
-    return Form(hx_post='/article', hx_target='#lang-pane', hx_swap='outerHTML')(outer)
+    return Form(
+        hx_ext='ws', ws_send=True, ws_connect='/article', hx_target='#lang-pane'
+    )(outer)
 
 def LangRow(orig, trans, cls=''):
     orig = Div(cls='lang-orig w-full pl-2 pr-2 border-r border-gray-300')(Span(orig))
@@ -79,11 +81,12 @@ def LangTutor(cache_dir='cache', **kwargs):
         return (title, style_oneping, style, script_oneping, script), body
 
     # get article
-    @app.post('/article')
-    async def article(url: str):
+    @app.ws('/article')
+    async def article(url: str, send):
         print(f'/article: {url}')
-        chat.set_article(url)
-        return LangPane(chat.texts)
+        await chat.set_article(url, send=send, debug=True)
+        pane = LangPane(chat.texts)
+        await send(pane)
 
     # connect websocket
     @app.ws('/generate')

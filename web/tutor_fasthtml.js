@@ -68,15 +68,19 @@ document.addEventListener('htmx:wsBeforeMessage', event => {
     const message = event.detail.message;
     const button = document.querySelector('#translate');
     if (message == 'LANGTUTOR_FETCHING') {
+        console.log('fetching');
         button.textContent = 'Fetching...';
         button.disabled = true;
     } else if (message == 'LANGTUTOR_EXTRACTING') {
+        console.log('extracting');
         button.textContent = 'Extracting...';
         button.disabled = true;
     } else if (message == 'LANGTUTOR_TRANSLATING') {
+        console.log('translating');
         button.textContent = 'Translating...';
         button.disabled = true;
     } else if (message == 'LANGTUTOR_DONE') {
+        console.log('done');
         button.textContent = 'Translate';
         button.disabled = false;
     }
