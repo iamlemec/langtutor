@@ -6,7 +6,7 @@ from uvicorn.supervisors import ChangeReload
 import fire
 
 from fasthtml.common import *
-from oneping.chat.fasthtml import chat_css, chat_js, ChatWindow, websocket
+from oneping.interface.fasthtml import ChatCSS, ChatJS, ChatWindow, websocket
 from translate import LangChat
 
 ##
@@ -50,83 +50,16 @@ def LangTutor(cache_dir='cache', **kwargs):
     ]
     app = FastHTML(hdrs=hdrs, ws_hdr=True, debug=True, live=True)
 
-    script_cursor = Script("""
-    function get_context() {
-        const query = document.getElementById('query').value;
-        const row = document.querySelector('.lang-row.active');
-        const orig = row.querySelector('.lang-orig');
-        const trans = row.querySelector('.lang-trans');
-        return {query: query, orig: orig.textContent, trans: trans.textContent};
-    }
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && event.target.id === 'url') {
-            event.preventDefault();
-        }
-        if (event.key === 'ArrowDown') {
-            const active = document.querySelector('.lang-row.active');
-            const next = active.nextElementSibling;
-            if (next == null) {
-                return;
-            }
-            active.classList.remove('active');
-            next.classList.add('active');
-            if (next.id == 'row-last') {
-                const trans = document.getElementById('trans');
-                trans.scrollTo({top: trans.scrollHeight, behavior: 'smooth'});
-            } else {
-                next.scrollIntoView({behavior: 'smooth', block: 'nearest'});
-            }
-            event.preventDefault();
-        } else if (event.key === 'ArrowUp') {
-            const active = document.querySelector('.lang-row.active');
-            const prev = active.previousElementSibling;
-            if (prev == null) {
-                return;
-            }
-            active.classList.remove('active');
-            prev.classList.add('active');
-            if (prev.id == 'row-first') {
-                const trans = document.getElementById('trans');
-                trans.scrollTo({top: 0, behavior: 'smooth'});
-            } else {
-                prev.scrollIntoView({behavior: 'smooth', block: 'nearest'});
-            }
-            event.preventDefault();
-        }
-    });
-    document.addEventListener('click', (event) => {
-        const row = event.target.closest('.lang-row');
-        if (row == null || row.classList.contains('active')) {
-            return;
-        }
-        const active = document.querySelector('.lang-row.active');
-        if (active != null) {
-            active.classList.remove('active');
-        }
-        row.classList.add('active');
-        row.scrollIntoView({behavior: 'smooth', block: 'nearest'});
-        event.preventDefault();
-    });
-    """)
-
-    style_cursor = Style("""
-    .lang-row.active {
-        border-color: #60a5fa;
-    }
-    .lang-row.active ~ .lang-row > .lang-trans {
-        border-radius: 0.25rem;
-    }
-    .lang-row.active ~ .lang-row > .lang-trans > span {
-        color: #e5e7eb;
-        background-color: #e5e7eb;
-    }
-    """)
-
     # connect main
     @app.get('/')
     def index():
+        # get oneping content
+        script_oneping = ChatJS()
+        style_oneping = ChatCSS()
+
         # chat style and script
-        style, script = Style(chat_css), Script(chat_js)
+        style = StyleX('web/tutor_fasthtml.css')
+        script = ScriptX('web/tutor_fasthtml.js')
 
         # window title
         title = Title('LangTutor')
@@ -143,7 +76,7 @@ def LangTutor(cache_dir='cache', **kwargs):
         body = Body(cls='h-screen w-screen flex flex-row')(left, right)
 
         # return
-        return (title, style, style_cursor, script, script_cursor), body
+        return (title, style_oneping, style, script_oneping, script), body
 
     # get article
     @app.post('/article')
