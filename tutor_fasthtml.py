@@ -15,10 +15,15 @@ from translate import LangChat
 
 def UrlInput():
     url = Input(
-        cls='w-full p-2 font-mono text-sm outline-none border-b border-gray-300 bg-gray-100',
+        id='url', cls='w-full p-2 font-mono text-sm outline-none bg-inherit',
         placeholder='Enter a URL', hx_get='/article', name='url'
     )
-    return Form(hx_post='/article', hx_target='#lang-pane', hx_swap='outerHTML')(url)
+    button = Button(
+        cls='font-mono text-sm outline-none border-b border-gray-300 rounded bg-blue-500 text-white m-2 pt-1 pb-1 pl-2 pr-2',
+        type='submit'
+    )('Translate')
+    outer = Div(cls='flex flex-row relative bg-gray-100 border-b border-gray-300 box-border')(url, button)
+    return Form(hx_post='/article', hx_target='#lang-pane', hx_swap='outerHTML')(outer)
 
 def LangRow(orig, trans, cls=''):
     orig = Div(cls='lang-orig w-full pl-2 pr-2 border-r border-gray-300')(Span(orig))
@@ -54,6 +59,9 @@ def LangTutor(cache_dir='cache', **kwargs):
         return {query: query, orig: orig.textContent, trans: trans.textContent};
     }
     document.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && event.target.id === 'url') {
+            event.preventDefault();
+        }
         if (event.key === 'ArrowDown') {
             const active = document.querySelector('.lang-row.active');
             const next = active.nextElementSibling;
