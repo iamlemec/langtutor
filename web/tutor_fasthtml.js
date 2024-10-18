@@ -1,10 +1,12 @@
 // get context from current row
 function get_context() {
     const query = document.getElementById('query').value;
-    const row = document.querySelector('.lang-row.active');
-    const orig = row.querySelector('.lang-orig');
-    const trans = row.querySelector('.lang-trans');
-    return {query: query, orig: orig.textContent, trans: trans.textContent};
+    const row_box = document.querySelector('.lang-row.active');
+    const orig_box = row_box.querySelector('.lang-orig');
+    const trans_box = row_box.querySelector('.lang-trans');
+    const orig = orig_box?.textContent ?? null;
+    const trans = trans_box?.textContent ?? null;
+    return {query, orig, trans};
 }
 
 // global keydown event

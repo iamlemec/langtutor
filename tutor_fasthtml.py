@@ -1,9 +1,9 @@
 # fasthtml language tutor
 
 import os
+import inspect
 import uvicorn
-from uvicorn.supervisors import ChangeReload
-import fire
+import argparse
 
 from fasthtml.common import *
 from oneping.interface.fasthtml import ChatCSS, ChatJS, ChatWindow, websocket
@@ -91,10 +91,16 @@ def LangTutor(cache_dir='cache', **kwargs):
     # connect websocket
     @app.ws('/generate')
     async def generate(query: str, orig: str, trans: str, send):
+        if orig == inspect._empty:
+            orig = None
+        if trans == inspect._empty:
+            trans = None
         print(f'QUERY: {query}')
         print(f'ORIG: {orig}')
         print(f'TRANS: {trans}')
-        stream = chat.stream_query(orig, trans, query)
+        has_ctx = orig is not None and trans is not None
+        ctx = (orig, trans) if has_ctx else None
+        stream = chat.stream_query(query, ctx=ctx)
         await websocket(query, stream, send)
         print('\nDONE')
 
@@ -106,7 +112,6 @@ def LangTutor(cache_dir='cache', **kwargs):
 ##
 
 # parse args
-import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--provider', type=str, default='local')
 parser.add_argument('--cache_dir', type=str, default='cache')

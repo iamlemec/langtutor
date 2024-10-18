@@ -2,3 +2,6 @@ __pycache__
 .sesskey
 text
 cache
+
+node_modules
+package-lock.json
