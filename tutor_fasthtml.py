@@ -23,23 +23,22 @@ def UrlInput():
         id='translate', type='submit'
     )('Translate')
     outer = Div(cls='flex flex-row relative bg-gray-100 border-b border-gray-300 box-border')(url, button)
-    return Form(
-        hx_ext='ws', ws_send=True, ws_connect='/article', hx_target='#lang-pane'
-    )(outer)
+    return Form(hx_ext='ws', ws_send=True, ws_connect='/article')(outer)
 
 def LangRow(orig, trans, cls=''):
     orig = Div(cls='lang-orig w-full pl-2 pr-2 border-r border-gray-300')(Span(orig))
     trans = Div(cls='lang-trans w-full pl-2 pr-2')(Span(trans))
     return Div(cls=f'lang-row w-full flex flex-row border rounded-sm pt-2 pb-2 {cls}')(orig, trans)
 
-def LangPane(texts=None):
-    if texts is None:
-        texts = []
-    first = Div(id='row-first', cls='lang-row hidden active')
-    last = Div(id='row-last', cls='lang-row hidden')
-    return Div(id='lang-pane', cls='w-full flex flex-col gap-2 p-2')(
-        first, *[LangRow(orig, trans) for orig, trans in texts], last
-    )
+def FirstRow():
+    return Div(id='row-first', cls='lang-row hidden active')
+
+def LastRow():
+    return Div(id='row-last', cls='lang-row hidden')
+
+def LangPane(empty=False):
+    children = [FirstRow(), LastRow()] if not empty else []
+    return Div(id='lang-pane', cls='w-full flex flex-col gap-2 p-2')(*children)
 
 def LangTutor(cache_dir='cache', **kwargs):
     # make chat interface
@@ -84,9 +83,22 @@ def LangTutor(cache_dir='cache', **kwargs):
     @app.ws('/article')
     async def article(url: str, send):
         print(f'/article: {url}')
-        await chat.set_article(url, send=send, debug=True)
-        pane = LangPane(chat.texts)
-        await send(pane)
+
+        # make pane
+        await send(LangPane(empty=True))
+
+        # make first row
+        first = FirstRow()
+        await send(Div(first, hx_swap_oob='beforeend', id='lang-pane'))
+
+        # set article
+        async for orig, trans in chat.set_article(url):
+            row_box = LangRow(orig, trans)
+            await send(Div(row_box, hx_swap_oob='beforeend', id='lang-pane'))
+
+        # make last row
+        last = LastRow()
+        await send(Div(last, hx_swap_oob='beforeend', id='lang-pane'))
 
     # connect websocket
     @app.ws('/generate')

@@ -11,12 +11,15 @@ from oneping import Chat
 ## tools
 ##
 
+def parse_json(json_str):
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        return None
+
 def parse_jsonl(jsonl):
     for line in jsonl.split('\n'):
-        try:
-            yield json.loads(line)
-        except json.JSONDecodeError:
-            continue
+        yield parse_json(line)
 
 def load_jsonl(path):
     with open(path, 'r') as fid:
@@ -45,30 +48,30 @@ SYSTEM_TRANSLATE = 'You are a helpful assistant that handles html extraction and
 
 PROMPT_TRANSLATE = 'Translate this text into English on a sentence-by-sentence basis. Ignore non-text content such as ads, headers, and footers. Return the result as a JSONL file where each line is a [original, translated] pair. Here is the text:'
 
+async def iter_lines_buffered(inputs):
+    buffer = ''
+    async for chunk in inputs:
+        buffer += chunk
+        lines = buffer.split('\n')
+        buffer = lines.pop()
+        for line in lines:
+            if len(line) > 0:
+                yield line
+    if len(buffer) > 0:
+        yield buffer
+
 def translate_text(chat, text, prompt=PROMPT_TRANSLATE, max_tokens=8192, prefill=True):
-    return chat.reply_async(
+    stream = chat.stream_async(
         f'{prompt}\n\n{text}',
         prefill='["' if prefill else None,
         max_tokens=max_tokens
     )
-
-async def dummy_translate(send):
-    import asyncio
-    await send('LANGTUTOR_FETCHING')
-    await asyncio.sleep(1)
-    await send('LANGTUTOR_TRANSLATING')
-    await asyncio.sleep(1)
-    await send('LANGTUTOR_DONE')
+    return iter_lines_buffered(stream)
 
 async def translate_url(
     url, prompt=PROMPT_TRANSLATE, system=SYSTEM_TRANSLATE, max_tokens=8192, prefill=True,
-    cache_dir=None, send=None, debug=False, **kwargs
+    cache_dir=None, **kwargs
 ):
-    # handle dummy sender
-    if send is None:
-        async def send(msg):
-            pass
-
     # get cache path
     if cache_dir is not None:
         if not os.path.exists(cache_dir):
@@ -76,17 +79,19 @@ async def translate_url(
         cache_path = os.path.join(cache_dir, url_hash(url))
         if os.path.exists(cache_path):
             with open(cache_path, 'r') as fid:
-                trans = fid.read()
-            if debug:
-                await dummy_translate(send)
-            return list(parse_jsonl(trans))
+                for chunk in fid:
+                    if len(chunk.strip()) == 0:
+                        continue
+                    print(f'CACHE: {chunk}')
+                    await asyncio.sleep(0.5)
+                    yield parse_json(chunk)
+            return
 
     # make translator chat
     chat = Chat(system=system, **kwargs)
 
     # fetch and extract
     print(f'Fetching text')
-    await send('LANGTUTOR_FETCHING')
     proc = await asyncio.create_subprocess_exec(
         'node', 'readability/index.js', url,
         stdout=asyncio.subprocess.PIPE,
@@ -97,24 +102,23 @@ async def translate_url(
     # check for errors and get text
     if proc.returncode != 0:
         print(f'Error executing Node.js script: {stderr.decode()}')
-        return []
+        return
     text = strip_text(stdout.decode())
 
     # translate text
     print(f'Translating text')
-    await send('LANGTUTOR_TRANSLATING')
-    trans = await translate_text(chat, text, prompt=prompt, max_tokens=2*max_tokens, prefill=prefill)
+    trans = ''
+    async for chunk in translate_text(chat, text, prompt=prompt, max_tokens=max_tokens, prefill=prefill):
+        print(f'CHUNK: {chunk}')
+        data = parse_json(chunk)
+        if data is not None:
+            trans += chunk
+            yield data
 
     # save to cache
     if cache_dir is not None:
         with open(cache_path, 'w') as fid:
             fid.write(trans)
-
-    # send done
-    await send('LANGTUTOR_DONE')
-
-    # return translation
-    return list(parse_jsonl(trans))
 
 ##
 ## chat tools
@@ -163,12 +167,13 @@ async def translate_path(path, **kwargs):
 
     # read file
     if fext == '.jsonl':
-        texts = load_jsonl(path)
+        with open(path, 'r') as fid:
+            for line in fid:
+                await asyncio.sleep(0.5)
+                yield parse_json(line)
     else:
-        texts = await translate_url(path, **kwargs)
-
-    # return texts
-    return texts
+        async for chunk in translate_url(path, **kwargs):
+            yield chunk
 
 class LangChat(Chat):
     def __init__(self, path=None, cache_dir=None, **kwargs):
@@ -178,19 +183,20 @@ class LangChat(Chat):
             self.set_article(path)
 
     async def set_article(self, path, **kwargs):
+        # reset states
+        self.clear()
+        self.texts = []
+
         # get or translate article
-        texts = await translate_path(
+        async for chunk in translate_path(
             path, provider=self.provider, model=self.model, cache_dir=self.cache_dir, **kwargs
-        )
+        ):
+            self.texts.append(chunk)
+            yield chunk
 
         # make system prompt
-        full_text = '\n\n'.join([f'{orig}\n{trans}' for orig, trans in texts])
-        system = SYSTEM_CHAT.format(text=full_text)
-
-        # store text and clear history
-        self.texts = texts
-        self.system = system
-        self.clear()
+        full_text = '\n\n'.join([f'{orig}\n{trans}' for orig, trans in self.texts])
+        self.system = SYSTEM_CHAT.format(text=full_text)
 
     async def stream_query(self, query, ctx=None):
         if ctx is not None:
