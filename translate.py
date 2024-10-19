@@ -80,10 +80,8 @@ async def translate_url(
         if os.path.exists(cache_path):
             with open(cache_path, 'r') as fid:
                 for chunk in fid:
-                    if len(chunk.strip()) == 0:
-                        continue
                     print(f'CACHE: {chunk}')
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.2)
                     yield parse_json(chunk)
             return
 
@@ -112,7 +110,7 @@ async def translate_url(
         print(f'CHUNK: {chunk}')
         data = parse_json(chunk)
         if data is not None:
-            trans += chunk
+            trans += f'{chunk}\n'
             yield data
 
     # save to cache
