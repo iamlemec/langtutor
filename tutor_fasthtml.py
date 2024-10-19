@@ -84,6 +84,9 @@ def LangTutor(cache_dir='cache', **kwargs):
     async def article(url: str, send):
         print(f'/article: {url}')
 
+        # send start message
+        await send('LANGTUTOR_START')
+
         # make pane
         await send(LangPane(empty=True))
 
@@ -99,6 +102,9 @@ def LangTutor(cache_dir='cache', **kwargs):
         # make last row
         last = LastRow()
         await send(Div(last, hx_swap_oob='beforeend', id='lang-pane'))
+
+        # send done message
+        await send('LANGTUTOR_DONE')
 
     # connect websocket
     @app.ws('/generate')
