@@ -1,9 +1,11 @@
 # fasthtml language tutor
 
 import os
+import uuid
 import inspect
 import uvicorn
 import argparse
+from collections import defaultdict
 
 from fasthtml.common import *
 from oneping.interface.fasthtml import ChatCSS, ChatJS, ChatWindow, websocket
@@ -23,7 +25,9 @@ def UrlInput():
         id='translate', type='submit'
     )('Translate')
     outer = Div(cls='flex flex-row relative bg-gray-100 border-b border-gray-300 box-border')(url, button)
-    return Form(hx_ext='ws', ws_send=True, ws_connect='/article')(outer)
+    return Form(
+        hx_ext='ws', hx_vals='js:{...get_url()}', ws_send=True, ws_connect='/article'
+    )(outer)
 
 def LangRow(orig, trans, cls=''):
     orig = Div(cls='lang-orig w-full pl-2 pr-2 border-r border-gray-300')(Span(orig))
@@ -42,7 +46,7 @@ def LangPane(empty=False):
 
 def LangTutor(cache_dir='cache', **kwargs):
     # make chat interface
-    chat = LangChat(cache_dir=cache_dir, **kwargs)
+    chats = defaultdict(lambda: LangChat(cache_dir=cache_dir, **kwargs))
 
     # create app object
     hdrs = [
@@ -53,7 +57,11 @@ def LangTutor(cache_dir='cache', **kwargs):
 
     # connect main
     @app.get('/')
-    def index():
+    def index(sess):
+        # set session chat
+        print('/index')
+        session_id = str(uuid.uuid4())
+
         # get oneping content
         script_oneping = ChatJS()
         style_oneping = ChatCSS()
@@ -61,6 +69,7 @@ def LangTutor(cache_dir='cache', **kwargs):
         # chat style and script
         style = StyleX('web/tutor_fasthtml.css')
         script = ScriptX('web/tutor_fasthtml.js')
+        session = Script(f'session_id = "{session_id}"')
 
         # window title
         title = Title('LangTutor')
@@ -77,12 +86,13 @@ def LangTutor(cache_dir='cache', **kwargs):
         body = Body(cls='h-screen w-screen flex flex-row')(left, right)
 
         # return
-        return (title, style_oneping, style, script_oneping, script), body
+        return (title, style_oneping, style, script_oneping, script, session), body
 
     # get article
     @app.ws('/article')
-    async def article(url: str, send):
-        print(f'/article: {url}')
+    async def article(session_id: str, url: str, send):
+        print(f'/article[{session_id[:6]}]: {url}')
+        chat = chats[session_id]
 
         # send start message
         await send('LANGTUTOR_START')
@@ -108,14 +118,16 @@ def LangTutor(cache_dir='cache', **kwargs):
 
     # connect websocket
     @app.ws('/generate')
-    async def generate(query: str, orig: str, trans: str, send):
+    async def generate(session_id: str, query: str, orig: str, trans: str, send):
         if orig == inspect._empty:
             orig = None
         if trans == inspect._empty:
             trans = None
+        print(f'/generate[{session_id[:6]}]')
         print(f'QUERY: {query}')
         print(f'ORIG: {orig}')
         print(f'TRANS: {trans}')
+        chat = chats[session_id]
         has_ctx = orig is not None and trans is not None
         ctx = (orig, trans) if has_ctx else None
         stream = chat.stream_query(query, ctx=ctx)

@@ -72,6 +72,8 @@ async def translate_url(
     url, prompt=PROMPT_TRANSLATE, system=SYSTEM_TRANSLATE, max_tokens=8192, prefill=True,
     cache_dir=None, **kwargs
 ):
+    print(f'TRANSLATE URL: {url}')
+
     # get cache path
     if cache_dir is not None:
         if not os.path.exists(cache_dir):
@@ -80,9 +82,10 @@ async def translate_url(
         if os.path.exists(cache_path):
             with open(cache_path, 'r') as fid:
                 for chunk in fid:
-                    print(f'CACHE: {chunk}')
+                    print(f'CACHE: {chunk.rstrip('\n')}')
                     await asyncio.sleep(0.2)
                     yield parse_json(chunk)
+            print(f'DONE LOADING CACHE')
             return
 
     # make translator chat
@@ -117,6 +120,8 @@ async def translate_url(
     if cache_dir is not None:
         with open(cache_path, 'w') as fid:
             fid.write(trans)
+
+    print(f'DONE TRANSLATING')
 
 ##
 ## chat tools
@@ -174,27 +179,23 @@ async def translate_path(path, **kwargs):
             yield chunk
 
 class LangChat(Chat):
-    def __init__(self, path=None, cache_dir=None, **kwargs):
+    def __init__(self, cache_dir=None, **kwargs):
         super().__init__(**kwargs)
         self.cache_dir = cache_dir
-        if path is not None:
-            self.set_article(path)
 
     async def set_article(self, path, **kwargs):
-        # reset states
-        self.clear()
-        self.texts = []
-
         # get or translate article
+        texts = []
         async for chunk in translate_path(
             path, provider=self.provider, model=self.model, cache_dir=self.cache_dir, **kwargs
         ):
-            self.texts.append(chunk)
+            texts.append(chunk)
             yield chunk
 
-        # make system prompt
-        full_text = '\n\n'.join([f'{orig}\n{trans}' for orig, trans in self.texts])
+        # make system prompt and clear
+        full_text = '\n\n'.join([f'{orig}\n{trans}' for orig, trans in texts])
         self.system = SYSTEM_CHAT.format(text=full_text)
+        self.clear()
 
     async def stream_query(self, query, ctx=None):
         if ctx is not None:

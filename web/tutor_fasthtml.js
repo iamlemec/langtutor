@@ -1,3 +1,9 @@
+// get url info
+function get_url() {
+    const url = document.getElementById('url').value;
+    return {session_id, url};
+}
+
 // get context from current row
 function get_context() {
     const query = document.getElementById('query').value;
@@ -6,7 +12,7 @@ function get_context() {
     const trans_box = row_box.querySelector('.lang-trans');
     const orig = orig_box?.textContent ?? null;
     const trans = trans_box?.textContent ?? null;
-    return {query, orig, trans};
+    return {session_id, query, orig, trans};
 }
 
 // global keydown event
