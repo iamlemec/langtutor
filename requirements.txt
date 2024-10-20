@@ -1,3 +1,5 @@
+asyncstdlib
 fire
+oneping
 textual
-https://github.com/CompendiumLabs/oneping
+fasthtml-python

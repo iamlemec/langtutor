@@ -53,7 +53,7 @@ def LangTutor(cache_dir='cache', **kwargs):
         Script(src="https://cdn.tailwindcss.com"),
         Script(src='https://cdn.jsdelivr.net/npm/marked/marked.min.js')
     ]
-    app = FastHTML(hdrs=hdrs, ws_hdr=True, debug=True, live=True)
+    app = FastHTML(hdrs=hdrs, exts='ws')
 
     # connect main
     @app.get('/')
