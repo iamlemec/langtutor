@@ -7,18 +7,36 @@ import uvicorn
 import argparse
 from collections import defaultdict
 
+from starlette.responses import RedirectResponse
 from fasthtml.common import *
+
 from oneping.interface.fasthtml import ChatCSS, ChatJS, ChatWindow, websocket
-from translate import LangChat
+from translate import LangChat, PROMPT_CHAT_PREFIX
+
+##
+## utilities
+##
+
+def gen_session_id():
+    uid = str(uuid.uuid4())
+    start, middle = uid[:4], uid[4:18]
+    return f'{start}-{middle}'
+
+def prune_injection(msg):
+    role, content = msg['role'], msg['content']
+    if role == 'user' and (match := re.search(PROMPT_CHAT_PREFIX, content)):
+        pruned = content[match.end():].lstrip()
+        return {'role': role, 'content': pruned}
+    return msg
 
 ##
 ## components
 ##
 
-def UrlInput():
+def UrlInput(value=''):
     url = Input(
         id='url', cls='w-full p-2 font-mono text-sm outline-none bg-inherit',
-        placeholder='Enter a URL', name='url'
+        placeholder='Enter a URL', name='url', value=value
     )
     button = Button(
         cls='font-mono text-sm outline-none border-b border-gray-300 rounded bg-blue-500 text-white m-2 pt-1 pb-1 pl-2 pr-2',
@@ -40,12 +58,15 @@ def FirstRow():
 def LastRow():
     return Div(id='row-last', cls='lang-row hidden')
 
-def LangTranslate(empty=False):
-    children = [FirstRow(), LastRow()] if not empty else []
+def LangTranslate(children=None):
+    children = [
+        FirstRow(), *[LangRow(orig, trans) for orig, trans in children], LastRow()
+    ] if children is not None else []
     return Div(id='lang-pane', cls='w-full flex flex-col gap-2 p-2')(*children)
 
-def LangHistory():
-    return ChatWindow(hx_vals='js:{...get_context()}')
+def LangHistory(history=None):
+    history = [prune_injection(item) for item in history] if history is not None else []
+    return ChatWindow(history=history, hx_vals='js:{...get_context()}')
 
 def LangTutor(**kwargs):
     # make chat interface
@@ -58,50 +79,24 @@ def LangTutor(**kwargs):
     ]
     app = FastHTML(hdrs=hdrs, exts='ws')
 
-    # connect main
+    # assign session_id
     @app.get('/')
     def index():
-        # set session chat
         print('/index')
-        session_id = str(uuid.uuid4())
-
-        # get oneping content
-        script_oneping = ChatJS()
-        style_oneping = ChatCSS()
-
-        # chat style and script
-        style = StyleX('web/tutor_fasthtml.css')
-        script = ScriptX('web/tutor_fasthtml.js')
-        session = Script(f'session_id = "{session_id}"')
-
-        # window title
-        title = Title('LangTutor')
-
-        # lang and chat window
-        url = UrlInput()
-        trans = LangTranslate()
-        hist = LangHistory()
-
-        # panes and body
-        scroll = Div(id='lang-scroll', cls='h-full overflow-y-scroll')(trans)
-        left = Div(cls='h-full w-[70%] flex flex-col border-r border-gray-300')(url, scroll)
-        right = Div(cls='h-full w-[30%] overflow-y-scroll bg-gray-100')(hist)
-        body = Body(cls='h-screen w-screen flex flex-row')(left, right)
-
-        # return
-        return (title, style_oneping, style, script_oneping, script, session), body
+        session_id = gen_session_id()
+        return RedirectResponse(f'/{session_id}')
 
     # get article
     @app.ws('/article')
     async def article(session_id: str, url: str, send):
-        print(f'/article[{session_id[:6]}]: {url}')
+        print(f'/article[{session_id}]: {url}')
         chat = chats[session_id]
 
         # send start message
         await send('LANGTUTOR_START')
 
         # clear contents
-        await send(LangTranslate(empty=True))
+        await send(LangTranslate())
         await send(LangHistory())
         # make first row
         first = FirstRow()
@@ -143,6 +138,38 @@ def LangTutor(**kwargs):
         stream = chat.stream_query(query, ctx=ctx)
         await websocket(query, stream, send)
         print('\nDONE')
+
+    # connect main
+    @app.get('/{session_id}')
+    def index(session_id: str):
+        # get or create chat
+        chat = chats[session_id]
+
+        # get oneping content
+        script_oneping = ChatJS()
+        style_oneping = ChatCSS()
+
+        # chat style and script
+        style = StyleX('web/tutor_fasthtml.css')
+        script = ScriptX('web/tutor_fasthtml.js')
+        session = Script(f'session_id = "{session_id}"')
+
+        # window title
+        title = Title('LangTutor')
+
+        # lang and chat window
+        url = UrlInput(chat.path)
+        trans = LangTranslate(chat.texts)
+        hist = LangHistory(chat.history)
+
+        # panes and body
+        scroll = Div(id='lang-scroll', cls='h-full overflow-y-scroll')(trans)
+        left = Div(cls='h-full w-[70%] flex flex-col border-r border-gray-300')(url, scroll)
+        right = Div(cls='h-full w-[30%] overflow-y-scroll bg-gray-100')(hist)
+        body = Body(cls='h-screen w-screen flex flex-row')(left, right)
+
+        # return
+        return (title, style_oneping, style, script_oneping, script, session), body
 
     # return
     return app
