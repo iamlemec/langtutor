@@ -15,6 +15,15 @@ function get_context() {
     return {session_id, query, orig, trans};
 }
 
+function scroll_to(target) {
+    if (typeof target == 'number') {
+        const trans = document.getElementById('lang-scroll');
+        trans.scrollTo({top: target, behavior: 'smooth'});
+    } else {
+        target.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    }
+}
+
 // global keydown event
 document.addEventListener('keydown', (event) => {
     // suppress enter key in url input
@@ -24,7 +33,8 @@ document.addEventListener('keydown', (event) => {
 
     // cursor control up/down
     if (event.key === 'ArrowDown') {
-        const active = document.querySelector('.lang-row.active');
+        const pane = document.getElementById('lang-pane');
+        const active = pane.querySelector('.lang-row.active');
         const next = active.nextElementSibling;
         if (next == null) {
             return;
@@ -32,14 +42,14 @@ document.addEventListener('keydown', (event) => {
         active.classList.remove('active');
         next.classList.add('active');
         if (next.id == 'row-last') {
-            const trans = document.getElementById('lang-scroll');
-            trans.scrollTo({top: trans.scrollHeight, behavior: 'smooth'});
+            scroll_to(trans.scrollHeight);
         } else {
-            next.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+            scroll_to(next);
         }
         event.preventDefault();
     } else if (event.key === 'ArrowUp') {
-        const active = document.querySelector('.lang-row.active');
+        const pane = document.getElementById('lang-pane');
+        const active = pane.querySelector('.lang-row.active');
         const prev = active.previousElementSibling;
         if (prev == null) {
             return;
@@ -47,10 +57,9 @@ document.addEventListener('keydown', (event) => {
         active.classList.remove('active');
         prev.classList.add('active');
         if (prev.id == 'row-first') {
-            const trans = document.getElementById('lang-scroll');
-            trans.scrollTo({top: 0, behavior: 'smooth'});
+            scroll_to(0);
         } else {
-            prev.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+            scroll_to(prev);
         }
         event.preventDefault();
     }
@@ -58,30 +67,36 @@ document.addEventListener('keydown', (event) => {
 
 // cursor control click
 document.addEventListener('click', (event) => {
+    const pane = document.getElementById('lang-pane');
     const row = event.target.closest('.lang-row');
     if (row == null || row.classList.contains('active')) {
         return;
     }
-    const active = document.querySelector('.lang-row.active');
+    const active = pane.querySelector('.lang-row.active');
     if (active != null) {
         active.classList.remove('active');
     }
     row.classList.add('active');
-    row.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    scroll_to(row);
     event.preventDefault();
 });
 
 // handle websocket events - translation progress
 document.addEventListener('htmx:wsBeforeMessage', event => {
     const message = event.detail.message;
-    const button = document.querySelector('#translate');
     if (message == 'LANGTUTOR_START') {
+        const button = document.getElementById('translate');
+        const query = document.getElementById('query');
         console.log('langtutor start');
         button.textContent = 'Translating...';
         button.disabled = true;
+        query.disabled = true;
     } else if (message == 'LANGTUTOR_DONE') {
+        const button = document.getElementById('translate');
+        const query = document.getElementById('query');
         console.log('langtutor done');
         button.textContent = 'Translate';
         button.disabled = false;
+        query.disabled = false;
     }
 });

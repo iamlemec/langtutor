@@ -92,12 +92,13 @@ def LangTutor(**kwargs):
         print(f'/article[{session_id}]: {url}')
         chat = chats[session_id]
 
-        # send start message
-        await send('LANGTUTOR_START')
-
         # clear contents
         await send(LangTranslate())
         await send(LangHistory())
+
+        # send start message
+        await send('LANGTUTOR_START')
+
         # make first row
         first = FirstRow()
         await send(Div(first, hx_swap_oob='beforeend', id='lang-pane'))
