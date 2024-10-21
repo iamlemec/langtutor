@@ -40,9 +40,12 @@ def FirstRow():
 def LastRow():
     return Div(id='row-last', cls='lang-row hidden')
 
-def LangPane(empty=False):
+def LangTranslate(empty=False):
     children = [FirstRow(), LastRow()] if not empty else []
     return Div(id='lang-pane', cls='w-full flex flex-col gap-2 p-2')(*children)
+
+def LangHistory():
+    return ChatWindow(hx_vals='js:{...get_context()}')
 
 def LangTutor(cache_dir='cache', **kwargs):
     # make chat interface
@@ -57,7 +60,7 @@ def LangTutor(cache_dir='cache', **kwargs):
 
     # connect main
     @app.get('/')
-    def index(sess):
+    def index():
         # set session chat
         print('/index')
         session_id = str(uuid.uuid4())
@@ -75,13 +78,13 @@ def LangTutor(cache_dir='cache', **kwargs):
         title = Title('LangTutor')
 
         # lang and chat window
-        lang = LangPane()
         url = UrlInput()
-        hist = ChatWindow(hx_vals='js:{...get_context()}')
-        trans = Div(id='trans', cls='h-full overflow-y-scroll')(lang)
+        trans = LangTranslate()
+        hist = LangHistory()
 
         # panes and body
-        left = Div(cls='h-full w-[70%] flex flex-col border-r border-gray-300')(url, trans)
+        scroll = Div(id='lang-scroll', cls='h-full overflow-y-scroll')(trans)
+        left = Div(cls='h-full w-[70%] flex flex-col border-r border-gray-300')(url, scroll)
         right = Div(cls='h-full w-[30%] overflow-y-scroll bg-gray-100')(hist)
         body = Body(cls='h-screen w-screen flex flex-row')(left, right)
 
@@ -97,9 +100,9 @@ def LangTutor(cache_dir='cache', **kwargs):
         # send start message
         await send('LANGTUTOR_START')
 
-        # make pane
-        await send(LangPane(empty=True))
-
+        # clear contents
+        await send(LangTranslate(empty=True))
+        await send(LangHistory())
         # make first row
         first = FirstRow()
         await send(Div(first, hx_swap_oob='beforeend', id='lang-pane'))
@@ -119,17 +122,24 @@ def LangTutor(cache_dir='cache', **kwargs):
     # connect websocket
     @app.ws('/generate')
     async def generate(session_id: str, query: str, orig: str, trans: str, send):
+        # this is dumb, but it works
         if orig == inspect._empty:
             orig = None
         if trans == inspect._empty:
             trans = None
+
+        # print query stats
         print(f'/generate[{session_id[:6]}]')
         print(f'QUERY: {query}')
         print(f'ORIG: {orig}')
         print(f'TRANS: {trans}')
+
+        # get chat session
         chat = chats[session_id]
         has_ctx = orig is not None and trans is not None
         ctx = (orig, trans) if has_ctx else None
+
+        # stream response
         stream = chat.stream_query(query, ctx=ctx)
         await websocket(query, stream, send)
         print('\nDONE')

@@ -32,7 +32,7 @@ document.addEventListener('keydown', (event) => {
         active.classList.remove('active');
         next.classList.add('active');
         if (next.id == 'row-last') {
-            const trans = document.getElementById('trans');
+            const trans = document.getElementById('lang-scroll');
             trans.scrollTo({top: trans.scrollHeight, behavior: 'smooth'});
         } else {
             next.scrollIntoView({behavior: 'smooth', block: 'nearest'});
@@ -47,7 +47,7 @@ document.addEventListener('keydown', (event) => {
         active.classList.remove('active');
         prev.classList.add('active');
         if (prev.id == 'row-first') {
-            const trans = document.getElementById('trans');
+            const trans = document.getElementById('lang-scroll');
             trans.scrollTo({top: 0, behavior: 'smooth'});
         } else {
             prev.scrollIntoView({behavior: 'smooth', block: 'nearest'});

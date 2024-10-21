@@ -17,36 +17,50 @@ def parse_json(json_str):
     except json.JSONDecodeError:
         return None
 
-def parse_jsonl(jsonl):
-    for line in jsonl.split('\n'):
-        yield parse_json(line)
-
 def load_jsonl(path):
     with open(path, 'r') as fid:
-        return list(parse_jsonl(fid.read()))
+        for line in fid:
+            yield parse_json(line)
 
-def save_jsonl(path, texts):
+def save_jsonl(path, data):
     with open(path, 'w') as fid:
-        for row in texts:
-            print(json.dumps(row), file=fid)
+        for row in data:
+            line = json.dumps(row, ensure_ascii=False)
+            print(line, file=fid)
 
 def url_hash(url):
     safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', url)
     return safe_name[:255]
 
 def strip_text(text):
-    text = re.sub(r'[\t\u00A0\u200B]+', ' ', text)
-    text = re.sub(r' +', ' ', text)
-    text = re.sub(r'[\n\r]+ ?', '\n', text)
+    text = re.sub(r'[\t\u00A0\u200B]+', ' ', text) # html whitespace
+    text = re.sub(r'\r', '', text) # windows line endings
+    text = re.sub(r' +', ' ', text) # multiple spaces
+    text = re.sub(r'\n{3,}', '\n\n', text) # many newlines
     return text.strip()
+
+# assumes ["orig", "trans"] structure
+def failsafe_parse(text):
+    match = re.match(r'^ *\[ *\"(.*)\" *, *\"(.*)\" *\] *$', text)
+    if match is not None:
+        return match.groups()
+    return None
 
 ##
 ## translation tools
 ##
 
-SYSTEM_TRANSLATE = 'You are a helpful assistant that handles html extraction and text translation from news articles in various languages.'
+SYSTEM_TRANSLATE = """You are a helpful assistant that handles the translation of text from news articles in various languages."""
 
-PROMPT_TRANSLATE = 'Translate this text into English on a sentence-by-sentence basis. Ignore non-text content such as ads, headers, and footers. Return the result as a JSONL file where each line is a [original, translated] pair. Here is the text:'
+PROMPT_TRANSLATE = """Translate this text into English on a sentence-by-sentence basis. Ignore non-text content such as ads, headers, and footers. Return the result as a JSONL file where each line is a [original, translated] pair. For example, if the original text is the Korean sentence:
+
+선생님은 학생들에게 "안녕"이라고 말했다.
+
+Then the returned JSONL line should be:
+
+["선생님은 학생들에게 "안녕"이라고 말했다.", "The teacher said "hello" to the students."]
+
+Here is the text you should translate:"""
 
 async def iter_lines_buffered(inputs):
     buffer = ''
@@ -80,12 +94,10 @@ async def translate_url(
             os.makedirs(cache_dir)
         cache_path = os.path.join(cache_dir, url_hash(url))
         if os.path.exists(cache_path):
-            with open(cache_path, 'r') as fid:
-                for chunk in fid:
-                    print(f'CACHE: {chunk.rstrip('\n')}')
-                    await asyncio.sleep(0.2)
-                    yield parse_json(chunk)
-            print(f'DONE LOADING CACHE')
+            print(f'LOADING FROM CACHE: {cache_path}')
+            for chunk in load_jsonl(cache_path):
+                await asyncio.sleep(0.2)
+                yield chunk
             return
 
     # make translator chat
@@ -108,18 +120,17 @@ async def translate_url(
 
     # translate text
     print(f'Translating text')
-    trans = ''
+    trans = []
     async for chunk in translate_text(chat, text, prompt=prompt, max_tokens=max_tokens, prefill=prefill):
         print(f'CHUNK: {chunk}')
-        data = parse_json(chunk)
+        data = failsafe_parse(chunk)
         if data is not None:
-            trans += f'{chunk}\n'
+            trans.append(data)
             yield data
 
     # save to cache
     if cache_dir is not None:
-        with open(cache_path, 'w') as fid:
-            fid.write(trans)
+        save_jsonl(cache_path, trans)
 
     print(f'DONE TRANSLATING')
 
@@ -136,7 +147,7 @@ BEGIN TEXT
 
 END TEXT
 
-Additionally, each user message will be prefaced by the text of the sentence that the user is currently looking at.
+Additionally, each user message may be prefaced by the text of the sentence that the user is currently looking at.
 """
 
 PROMPT_CHAT_CONTEXT = """
@@ -185,15 +196,15 @@ class LangChat(Chat):
 
     async def set_article(self, path, **kwargs):
         # get or translate article
-        texts = []
+        self.texts = []
         async for chunk in translate_path(
             path, provider=self.provider, model=self.model, cache_dir=self.cache_dir, **kwargs
         ):
-            texts.append(chunk)
+            self.texts.append(chunk)
             yield chunk
 
         # make system prompt and clear
-        full_text = '\n\n'.join([f'{orig}\n{trans}' for orig, trans in texts])
+        full_text = '\n\n'.join([f'{orig}\n{trans}' for orig, trans in self.texts])
         self.system = SYSTEM_CHAT.format(text=full_text)
         self.clear()
 
