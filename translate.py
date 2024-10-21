@@ -190,15 +190,18 @@ async def translate_path(path, **kwargs):
             yield chunk
 
 class LangChat(Chat):
-    def __init__(self, cache_dir=None, **kwargs):
+    def __init__(self, prefill=True, max_tokens=8192, cache_dir=None, **kwargs):
         super().__init__(**kwargs)
+        self.prefill = prefill
+        self.max_tokens = max_tokens
         self.cache_dir = cache_dir
 
     async def set_article(self, path, **kwargs):
         # get or translate article
         self.texts = []
         async for chunk in translate_path(
-            path, provider=self.provider, model=self.model, cache_dir=self.cache_dir, **kwargs
+            path, provider=self.provider, model=self.model, prefill=self.prefill,
+            max_tokens=self.max_tokens, cache_dir=self.cache_dir, **kwargs
         ):
             self.texts.append(chunk)
             yield chunk

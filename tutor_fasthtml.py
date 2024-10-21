@@ -47,9 +47,9 @@ def LangTranslate(empty=False):
 def LangHistory():
     return ChatWindow(hx_vals='js:{...get_context()}')
 
-def LangTutor(cache_dir='cache', **kwargs):
+def LangTutor(**kwargs):
     # make chat interface
-    chats = defaultdict(lambda: LangChat(cache_dir=cache_dir, **kwargs))
+    chats = defaultdict(lambda: LangChat(**kwargs))
 
     # create app object
     hdrs = [
@@ -154,11 +154,17 @@ def LangTutor(cache_dir='cache', **kwargs):
 # parse args
 parser = argparse.ArgumentParser()
 parser.add_argument('--provider', type=str, default='local')
-parser.add_argument('--cache_dir', type=str, default='cache')
+parser.add_argument('--model', type=str, default=None)
+parser.add_argument('--prefill', default=True, action=argparse.BooleanOptionalAction)
+parser.add_argument('--max-tokens', type=int, default=8192)
+parser.add_argument('--cache-dir', type=str, default='cache')
 parser.add_argument('--host', type=str, default='127.0.0.1')
 parser.add_argument('--port', type=int, default=5000)
 args = parser.parse_args()
 
 # run server
-app = LangTutor(provider=args.provider, cache_dir=args.cache_dir)
+app = LangTutor(
+    provider=args.provider, model=args.model, prefill=args.prefill,
+    max_tokens=args.max_tokens, cache_dir=args.cache_dir
+)
 serve(host=args.host, port=args.port)
