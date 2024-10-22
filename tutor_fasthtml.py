@@ -74,10 +74,13 @@ def LangTutor(**kwargs):
 
     # create app object
     hdrs = [
-        Script(src="https://cdn.tailwindcss.com"),
-        Script(src='https://cdn.jsdelivr.net/npm/marked/marked.min.js')
+        ScriptX('web/libs/fasthtml.js'),
+        ScriptX('web/libs/htmx.min.js'),
+        ScriptX('web/libs/ws.js'),
+        ScriptX('web/libs/tailwind.min.js'),
+        ScriptX('web/libs/marked.min.js'),
     ]
-    app = FastHTML(hdrs=hdrs, exts='ws')
+    app = FastHTML(hdrs=hdrs, default_hdrs=False)
 
     # assign session_id
     @app.get('/')
