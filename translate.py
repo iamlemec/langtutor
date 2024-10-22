@@ -39,11 +39,15 @@ def strip_text(text):
     text = re.sub(r'\n{3,}', '\n\n', text) # many newlines
     return text.strip()
 
+def unescape_quotes(text):
+    return re.sub(r'\\"', '"', text)
+
 # assumes ["orig", "trans"] structure
 def failsafe_parse(text):
     match = re.match(r'^ *\[ *\"(.*)\" *, *\"(.*)\" *\] *$', text)
     if match is not None:
-        return match.groups()
+        orig, trans = map(unescape_quotes, match.groups())
+        return orig, trans
     return None
 
 ##
