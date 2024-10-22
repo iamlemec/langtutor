@@ -54,9 +54,9 @@ def failsafe_parse(text):
 ## translation tools
 ##
 
-SYSTEM_TRANSLATE = """You are a helpful assistant that handles the translation of text from news articles in various languages."""
+SYSTEM_TRANSLATE = """You are a helpful assistant that handles the translation of text from news articles in various languages into English. When given a request, provide a complete reply without requesting additional information."""
 
-PROMPT_TRANSLATE = """Translate this text into English on a sentence-by-sentence basis. Ignore non-text content such as ads, headers, and footers. Return the result as a JSONL file where each line is a [original, translated] pair. For example, if the original text is the Korean sentence:
+PROMPT_TRANSLATE = """Translate the entirety of this text into English on a sentence-by-sentence basis. Ignore non-text content such as ads, headers, and footers. Return the result as a JSONL file where each line is a [original, translated] pair. For example, if the original text is the Korean sentence:
 
 선생님은 학생들에게 "안녕"이라고 말했다.
 
@@ -77,6 +77,22 @@ async def iter_lines_buffered(inputs):
                 yield line
     if len(buffer) > 0:
         yield buffer
+
+async def extract_text(url):
+    # fetch and extract
+    print(f'Fetching text')
+    proc = await asyncio.create_subprocess_exec(
+        'node', 'readability/index.js', url,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await proc.communicate()
+
+    # check for errors and get text
+    if proc.returncode != 0:
+        print(f'Error executing Node.js script: {stderr.decode()}')
+        return
+    return strip_text(stdout.decode())
 
 def translate_text(chat, text, prompt=PROMPT_TRANSLATE, max_tokens=8192, prefill=True):
     stream = chat.stream_async(
@@ -104,27 +120,16 @@ async def translate_url(
                 yield chunk
             return
 
-    # make translator chat
-    chat = Chat(system=system, **kwargs)
-
     # fetch and extract
-    print(f'Fetching text')
-    proc = await asyncio.create_subprocess_exec(
-        'node', 'readability/index.js', url,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    stdout, stderr = await proc.communicate()
-
-    # check for errors and get text
-    if proc.returncode != 0:
-        print(f'Error executing Node.js script: {stderr.decode()}')
+    print('Extracting text')
+    if (text := await extract_text(url)) is None:
+        print(f'Error extracting text')
         return
-    text = strip_text(stdout.decode())
 
     # translate text
-    print(f'Translating text')
+    print('Translating text')
     trans = []
+    chat = Chat(system=system, **kwargs)
     async for chunk in translate_text(chat, text, prompt=prompt, max_tokens=max_tokens, prefill=prefill):
         print(f'CHUNK: {chunk}')
         data = failsafe_parse(chunk)
@@ -180,27 +185,13 @@ PROMPT_CHAT = """
 {query}
 """
 
-async def translate_path(path, **kwargs):
-    # get file info
-    fname = os.path.basename(path)
-    fbase, fext = os.path.splitext(fname)
-
-    # read file
-    if fext == '.jsonl':
-        with open(path, 'r') as fid:
-            for line in fid:
-                await asyncio.sleep(0.5)
-                yield parse_json(line)
-    else:
-        async for chunk in translate_url(path, **kwargs):
-            yield chunk
-
 class LangChat(Chat):
     def __init__(self, prefill=True, max_tokens=8192, cache_dir=None, **kwargs):
         super().__init__(**kwargs)
         self.prefill = prefill
         self.max_tokens = max_tokens
         self.cache_dir = cache_dir
+        self.chat_args = kwargs
 
         # null translation state
         self.path = ''
@@ -212,9 +203,9 @@ class LangChat(Chat):
         self.texts = []
 
         # get or translate article
-        async for chunk in translate_path(
-            path, provider=self.provider, model=self.model, prefill=self.prefill,
-            max_tokens=self.max_tokens, cache_dir=self.cache_dir, **kwargs
+        async for chunk in translate_url(
+            path, prefill=self.prefill, max_tokens=self.max_tokens, cache_dir=self.cache_dir,
+            **self.chat_args, **kwargs
         ):
             self.texts.append(chunk)
             yield chunk
@@ -239,9 +230,12 @@ class LangChat(Chat):
 ##
 
 # translate article and save
-def main(path, save, provider='local', **kwargs):
-    texts = translate_path(path, provider=provider, **kwargs)
-    save_jsonl(save, texts)
+async def main(path, provider='local', native=False, cache=True, **kwargs):
+    cache_dir = 'cache' if cache else None
+    chunks = translate_path(path, provider=provider, native=native, cache_dir=cache_dir, **kwargs)
+    async for orig, trans in chunks:
+        data = json.dumps([orig, trans], ensure_ascii=False)
+        print(data)
 
 if __name__ == '__main__':
     import fire
