@@ -54,17 +54,30 @@ def failsafe_parse(text):
 ## translation tools
 ##
 
-SYSTEM_TRANSLATE = """You are a helpful assistant that handles the translation of text from news articles in various languages into English. When given a request, provide a complete reply without requesting additional information."""
+SYSTEM_TRANSLATE = """You are a helpful assistant that handles the translation of text from news articles in various languages into English. When given the text of an article in a non-English language, translate it into English on a sentence-by-sentence basis. Ignore non-text content such as ads, headers, and footers. Translate the entire article in one message, do not return partial translations.
 
-PROMPT_TRANSLATE = """Translate the entirety of this text into English on a sentence-by-sentence basis. Ignore non-text content such as ads, headers, and footers. Return the result as a JSONL file where each line is a [original, translated] pair. For example, if the original text is the Korean sentence:
+Return the result as a JSONL file where each line is a [original, translated] pair. For example, if the original text is:
 
-선생님은 학생들에게 "안녕"이라고 말했다.
+전국 4개 기초단체장을 뽑은 재·보궐 선거에서 이변은 없었습니다. 보수 강세 지역으로 분류되는 부산 금정구청장 선거에선 국민의힘 윤일현 후보가 당선됐습니다. 윤 후보는 조국혁신당과 야권 단일화에 성공한 민주당 김경지 후보를 20%p 넘는 차이로 꺾었습니다.
 
 Then the returned JSONL line should be:
 
-["선생님은 학생들에게 "안녕"이라고 말했다.", "The teacher said "hello" to the students."]
+["전국 4개 기초단체장을 뽑은 재·보궐 선거에서 이변은 없었습니다.", "There were no surprises in the by-elections for four local government heads across the country."]
+["보수 강세 지역으로 분류되는 부산 금정구청장 선거에선 국민의힘 윤일현 후보가 당선됐습니다.", "In the election for the Geumjeong-gu mayor in Busan, classified as a conservative stronghold, Yoon Il-hyun of the People Power Party was elected."]
+["윤 후보는 조국혁신당과 야권 단일화에 성공한 민주당 김경지 후보를 20%p 넘는 차이로 꺾었습니다.", "Candidate Yoon defeated Democratic Party candidate Kim Kyung-ji, who had successfully unified with the Cho Kuk Innovation Party and the opposition, by a margin of over 20 percentage points."]
 
-Here is the text you should translate:"""
+However, if the article is quoting someone, do not split the quoted text into multiple sentences. For example, if the original text is:
+
+"Me llamaron en febrero y me preguntaron si quería ser directora. Claro, yo flipé. Estaba en un campeonato de España de pista y dije, ¡¿cómo?!", reconoce con risa nerviosa, aún incrédula. "Tengo el título desde hace dos años, pero no me lo había planteado nunca, la verdad. Entonces, me reuní con ellos y vi que no estaban aquí por moda, sino que querían fomentar el ciclismo femenino de verdad".
+
+You can return this as two JSONL lines:
+
+["\"Me llamaron en febrero y me preguntaron si quería ser directora. Claro, yo flipé. Estaba en un campeonato de España de pista y dije, ¡¿cómo?!\", reconoce con risa nerviosa, aún incrédula.", "\"They called me in February and asked me if I wanted to be a director. Of course, I was amazed. I was at a Spanish track championship and said, what?!\" she admits with a nervous laugh, still incredulous."]
+["\"Tengo el título desde hace dos años, pero no me lo había planteado nunca, la verdad. Entonces, me reuní con ellos y vi que no estaban aquí por moda, sino que querían fomentar el ciclismo femenino de verdad\".", "\"I've had the qualification for two years, but I had never considered it, honestly. Then, I met with them and saw they weren't here because it was trendy, but because they really wanted to promote women's cycling.\""]
+
+As you see above, in the case of quoted text, it is helpful to escape the quotation marks inside the original and translated strings. The examples given here were in Korean and Spanish, but you may receive text in any language."""
+
+PROMPT_TRANSLATE = """Here is the article text you should translate:"""
 
 async def iter_lines_buffered(inputs):
     buffer = ''
