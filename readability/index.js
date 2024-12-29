@@ -1,7 +1,5 @@
 const fs = require('fs');
-const path = require('path');
-const http = require('http');
-const {Readability} = require('@mozilla/readability');
+const { Readability } = require('@mozilla/readability');
 const JSDOM = require('jsdom').JSDOM;
 
 // article getter
