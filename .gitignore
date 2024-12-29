@@ -1,7 +1,6 @@
 __pycache__
-.sesskey
-text
-cache
-
 node_modules
 package-lock.json
+.sesskey
+langtutor/cache
+react/dist
