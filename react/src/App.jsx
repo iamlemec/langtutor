@@ -1,23 +1,41 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
-const test = [
+import { fetchStream } from './utils.jsx'
+
+const init = [
   ['Hello world', 'Hello world'],
   ['This is a test', 'This is a test'],
 ]
 
 function App() {
   const [article, setArticle] = useState(null)
-  const [chunks, setChunks] = useState(test)
+  const [chunks, setChunks] = useState(init)
   const [cursor, setCursor] = useState(-1)
   const inputRef = useRef(null)
 
   function handleTranslate() {
-    const text = inputRef.current.value
-    if (text.length == 0) return
-    setArticle(text)
+    // get article url
+    const url = inputRef.current.value
+    if (url.length == 0) return
+
+    // reset ui
+    setArticle(url)
+    setChunks([])
     setCursor(-1)
-    setChunks(cs => [...cs, ...test])
+
+    // stream in chunks
+    const stream = fetchStream('/api/article', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    })
+
+    // add to list
+    for (line of stream) {
+      const data = JSON.parse(line)
+      setChunks(cs => [...cs, data])
+    }
   }
 
   // add keybindings
@@ -45,7 +63,7 @@ function App() {
         </div>
         <div className="flex flex-col flex-1 w-full gap-2 p-2">
           {chunks.map(([orig, trans], index) => (
-            <div key={index} className={`flex flex-row p-2 w-full border rounded-sm border-gray-200 ${cursor === index ? 'border-blue-500' : ''}`}>
+            <div key={index} className={`flex flex-row p-2 w-full border rounded-sm ${cursor === index ? 'border-blue-500' : 'border-gray-200'}`}>
               <div className="w-[50%] mr-1 border-r border-gray-200">{orig}</div>
               <div className="w-[50%] ml-1">
                 <span className={index > cursor ? 'bg-gray-100 text-gray-100' : ''}>{trans}</span>
