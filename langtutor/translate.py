@@ -5,7 +5,7 @@ import urllib
 import asyncio
 from bs4 import BeautifulSoup, Comment
 
-from oneping import Chat
+import oneping
 
 ##
 ## tools
@@ -95,7 +95,7 @@ async def extract_text(url):
     # fetch and extract
     print(f'Fetching text')
     proc = await asyncio.create_subprocess_exec(
-        'node', 'readability/index.js', url,
+        'node', '../readability/index.js', url,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )
@@ -107,18 +107,17 @@ async def extract_text(url):
         return
     return strip_text(stdout.decode())
 
-def translate_text(chat, text, prompt=PROMPT_TRANSLATE, max_tokens=8192, prefill=True):
-    stream = chat.stream_async(
+def translate_text(text, prompt=PROMPT_TRANSLATE, system=SYSTEM_TRANSLATE, max_tokens=8192, prefill=True, **kwargs):
+    stream = oneping.stream_async(
         f'{prompt}\n\n{text}',
         prefill='["' if prefill else None,
-        max_tokens=max_tokens
+        max_tokens=max_tokens,
+        system=system,
+        **kwargs
     )
     return iter_lines_buffered(stream)
 
-async def translate_url(
-    url, prompt=PROMPT_TRANSLATE, system=SYSTEM_TRANSLATE, max_tokens=8192, prefill=True,
-    cache_dir=None, **kwargs
-):
+async def translate_url(url, cache_dir=None, **kwargs):
     print(f'TRANSLATE URL: {url}')
 
     # get cache path
@@ -142,8 +141,7 @@ async def translate_url(
     # translate text
     print('Translating text')
     trans = []
-    chat = Chat(system=system, **kwargs)
-    async for chunk in translate_text(chat, text, prompt=prompt, max_tokens=max_tokens, prefill=prefill):
+    async for chunk in translate_text(text, **kwargs):
         print(f'CHUNK: {chunk}')
         data = failsafe_parse(chunk)
         if data is not None:
@@ -198,7 +196,7 @@ PROMPT_CHAT = """
 {query}
 """
 
-class LangChat(Chat):
+class LangChat(oneping.Chat):
     def __init__(self, prefill=True, max_tokens=8192, cache_dir=None, **kwargs):
         super().__init__(**kwargs)
         self.prefill = prefill
@@ -243,9 +241,9 @@ class LangChat(Chat):
 ##
 
 # translate article and save
-async def main(path, provider='local', native=False, cache=True, **kwargs):
+async def main(path, provider='anthropic', native=False, cache=True, **kwargs):
     cache_dir = 'cache' if cache else None
-    chunks = translate_path(path, provider=provider, native=native, cache_dir=cache_dir, **kwargs)
+    chunks = translate_url(url, provider=provider, native=native, cache_dir=cache_dir, **kwargs)
     async for orig, trans in chunks:
         data = json.dumps([orig, trans], ensure_ascii=False)
         print(data)

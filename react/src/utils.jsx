@@ -1,26 +1,30 @@
 // utilities
 
+function lineStreamer(chunk, controller) {
+    const lines = chunk.split('\n')
+    for (const line of lines) {
+        if (line.length > 0) {
+            const data = JSON.parse(line)
+            controller.enqueue(data)
+        }
+    }
+}
+
 async function* fetchStream(url, args={}) {
-    try {
-        // connect and get status
-        const response = await fetch(url, args)
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`)
-        }
+    // connect and get status
+    const response = await fetch(url, args)
+    if (!response.ok) {
+        throw new Error(`HTTP error: status ${response.status}`)
+    }
 
-        // make reader and decoder
-        const reader = response.body.getReader()
-        const decoder = new TextDecoder('utf-8')
+    // make reader and decode
+    const reader = response.body
+        .pipeThrough(new TextDecoderStream())
+        .pipeThrough(new TransformStream({ transform: lineStreamer }))
 
-        // yield stream of chunks
-        while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            const result = decoder.decode(value, { stream: true })
-            yield result
-        }
-    } catch (error) {
-        console.error('Error fetching stream:', error)
+    // yield stream of chunks
+    for await (const chunk of reader) {
+        yield chunk
     }
 }
 
