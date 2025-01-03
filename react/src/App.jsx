@@ -99,11 +99,11 @@ function App() {
             <button className="px-1 bg-blue-500 text-white h-full w-full rounded font-bold text-sm" onClick={handleTranslate}>Translate</button>
           </div>
         </div>
-        <div className="flex-1 w-full overflow-y-auto">
+        <div className="flex-1 w-full min-h-0">
           <LangList chunks={chunks} cursor={cursor} setCursor={setCursor} />
         </div>
       </div>
-      <div className="w-[450px] h-full border-l border-gray-200 overflow-y-auto">
+      <div className="w-[450px] h-full border-l border-gray-200">
         {article && <LangChat messages={messages} onSubmit={handleGenerate} generating={generating} />}
       </div>
       {error && <div className="absolute bottom-5 right-5 w-[350px] border rounded border-gray-300 bg-gray-100 p-2 overflow-y-auto">
