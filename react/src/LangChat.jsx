@@ -23,7 +23,7 @@ function LangPrompt({ onSubmit }) {
   }
 
   return <LangMessage role="user">
-    <input type="text" className="w-full outline-none" onKeyDown={handleKeyDown} ref={queryRef} />
+    <input ref={queryRef} type="text" className="w-full outline-none" onKeyDown={handleKeyDown} />
   </LangMessage>
 }
 
@@ -31,7 +31,7 @@ export default function LangChat({ messages, onSubmit, generating }) {
   return <div className="flex flex-col gap-4 px-2 py-4">
     {messages.map(({role, content}, index) =>
       <LangMessage key={index} role={role}>
-        <div className="markdown" dangerouslySetInnerHTML={{ __html: marked(content) }} />
+        <div className="markdown" dangerouslySetInnerHTML={{ __html: marked(content, {breaks: true}) }} />
       </LangMessage>
     )}
     {!generating && <LangPrompt key={messages.length} onSubmit={onSubmit} />}
