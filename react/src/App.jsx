@@ -5,21 +5,11 @@ import LangList from './LangList.jsx'
 import LangChat from './LangChat.jsx'
 import { fetchTextStream, fetchJsonStream } from './utils.jsx'
 
-const init_chunks = [
-  ['Hello world', 'Hello world'],
-  ['This is a test', 'This is a test'],
-]
-
-const init_messages = [
-  {role: 'user', content: 'Hello world'},
-  {role: 'assistant', content: 'This is a test'},
-]
-
 function App() {
   const [article, setArticle] = useState(null)
-  const [chunks, setChunks] = useState(init_chunks)
+  const [chunks, setChunks] = useState([])
   const [cursor, setCursor] = useState(-1)
-  const [messages, setMessages] = useState(init_messages)
+  const [messages, setMessages] = useState([])
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState(null)
   const inputRef = useRef(null)
@@ -113,7 +103,7 @@ function App() {
           <LangList chunks={chunks} cursor={cursor} setCursor={setCursor} />
         </div>
       </div>
-      <div className="w-[400px] h-full border-l border-gray-200 overflow-y-auto">
+      <div className="w-[450px] h-full border-l border-gray-200 overflow-y-auto">
         {article && <LangChat messages={messages} onSubmit={handleGenerate} generating={generating} />}
       </div>
       {error && <div className="absolute bottom-5 right-5 w-[350px] border rounded border-gray-300 bg-gray-100 p-2 overflow-y-auto">
