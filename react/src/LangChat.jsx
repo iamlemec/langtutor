@@ -1,7 +1,10 @@
 // LangChat component
 
+import { useRef } from 'react'
+import { marked } from 'marked'
+
 function LangMessage({ role, children }) {
-  return <div className="relative flex flex-row gap-2 border rounded p-2">
+  return <div className="relative flex flex-row gap-2 border rounded p-2 pt-3">
     <div className="absolute top-[-8px] left-[7px] border rounded border-gray-300 text-xs px-1 bg-gray-100 small-caps font-bold">
       <div className="mt-[-2px]">{role}</div>
     </div>
@@ -9,19 +12,28 @@ function LangMessage({ role, children }) {
   </div>
 }
 
-function LangPrompt() {
+function LangPrompt({ onSubmit }) {
+  const queryRef = useRef(null)
+
+  function handleKeyDown(event) {
+    if (event.key === 'Enter') {
+      const query = queryRef.current.value
+      onSubmit(query)
+    }
+  }
+
   return <LangMessage role="user">
-    <input type="text" className="w-full outline-none"/>
+    <input type="text" className="w-full outline-none" onKeyDown={handleKeyDown} ref={queryRef} />
   </LangMessage>
 }
 
-export default function LangChat({ messages }) {
+export default function LangChat({ messages, onSubmit, generating }) {
   return <div className="flex flex-col gap-4 px-2 py-4">
     {messages.map(({role, content}, index) =>
       <LangMessage key={index} role={role}>
-        <div className="[overflow-wrap:anywhere]">{content}</div>
+        <div className="markdown" dangerouslySetInnerHTML={{ __html: marked(content) }} />
       </LangMessage>
     )}
-    <LangPrompt key={messages.length}/>
+    {!generating && <LangPrompt key={messages.length} onSubmit={onSubmit} />}
   </div>
 }
