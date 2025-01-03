@@ -30,9 +30,9 @@ def stream_jsonl(path):
 ## main interface
 ##
 
-def main(host='127.0.0.1', port=5000, cache_dir='cache', provider='anthropic', **kwargs):
+def main(host='127.0.0.1', port=5000, provider='anthropic', cache_dir='cache', **kwargs):
     # make chat interface
-    chats = LangChat(provider=provider, **kwargs)
+    chat = LangChat(cache_dir=cache_dir, provider=provider, **kwargs)
 
     # make fastapi server
     app = FastAPI()
@@ -41,27 +41,28 @@ def main(host='127.0.0.1', port=5000, cache_dir='cache', provider='anthropic', *
     @app.post('/api/article')
     async def article(request: Request):
         # get url
-        url = await request.json()
-        url = url['url']
+        data = await request.json()
+        url = data['url']
+
+        # print query stats
+        print(f'/api/article')
+        print(f'URL: {url}')
 
         # fetch article
-        stream = (
-            json.dumps(chunk) async for chunk in
-            translate_url(url, cache_dir=cache_dir, provider=provider)
-        )
+        stream = (json.dumps(chunk) async for chunk in chat.set_article(url))
         return StreamingResponse(stream, media_type='application/x-ndjson')
 
     # generate chat
     @app.post('/api/generate')
     async def generate(request: Request):
         # get query
-        query = await request.json()
-        query = query['query']
-        orig = query['orig']
-        trans = query['trans']
+        data = await request.json()
+        query = data['query']
+        orig = data.get('orig', None)
+        trans = data.get('trans', None)
 
         # print query stats
-        print(f'/generate')
+        print(f'/api/generate')
         print(f'QUERY: {query}')
         print(f'ORIG: {orig}')
         print(f'TRANS: {trans}')
@@ -72,7 +73,7 @@ def main(host='127.0.0.1', port=5000, cache_dir='cache', provider='anthropic', *
 
         # stream response
         stream = chat.stream_query(query, ctx=ctx)
-        print('\nDONE')
+        return StreamingResponse(stream, media_type='text/event-stream')
 
     # return app
     return app

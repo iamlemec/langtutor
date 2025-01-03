@@ -199,41 +199,40 @@ PROMPT_CHAT = """
 class LangChat(oneping.Chat):
     def __init__(self, prefill=True, max_tokens=8192, cache_dir=None, **kwargs):
         super().__init__(**kwargs)
-        self.prefill = prefill
-        self.max_tokens = max_tokens
-        self.cache_dir = cache_dir
-        self.chat_args = kwargs
-
-        # null translation state
-        self.path = ''
-        self.texts = []
+        self.chat_args = dict(
+            prefill=prefill, max_tokens=max_tokens, cache_dir=cache_dir, **kwargs
+        )
+        self.texts = None
 
     async def set_article(self, path, **kwargs):
         # reset translation state
-        self.path = path
         self.texts = []
 
         # get or translate article
-        async for chunk in translate_url(
-            path, prefill=self.prefill, max_tokens=self.max_tokens, cache_dir=self.cache_dir,
-            **self.chat_args, **kwargs
-        ):
+        async for chunk in translate_url(path, **self.chat_args):
             self.texts.append(chunk)
             yield chunk
 
         # make system prompt and clear chat history
-        full_text = '\n\n'.join([f'{orig}\n{trans}' for orig, trans in self.texts])
+        full_text = '\n\n'.join(f'{orig}\n{trans}' for orig, trans in self.texts)
         self.system = SYSTEM_CHAT.format(text=full_text)
         self.clear()
 
     async def stream_query(self, query, ctx=None):
+        if self.texts is None:
+            return
+
+        # make context
         if ctx is not None:
             orig, trans = ctx
             context = PROMPT_CHAT_CONTEXT.format(orig=orig, trans=trans)
         else:
             context = PROMPT_CHAT_GLOBAL
+
+        # stream response
         message = PROMPT_CHAT.format(context=context, prefix=PROMPT_CHAT_PREFIX, query=query)
         async for chunk in self.stream_async(message):
+            oneping.sprint(chunk)
             yield chunk
 
 ##

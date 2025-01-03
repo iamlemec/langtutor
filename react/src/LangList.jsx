@@ -45,8 +45,8 @@ export default function LangList({ chunks, cursor, setCursor }) {
           ref={el => listRefs.current[index] = el}
           className={`flex flex-row p-2 w-full border rounded-sm ${cursor === index ? 'border-blue-500' : 'border-gray-200'}`}
         >
-          <div className="w-[50%] mr-1 border-r border-gray-200">{orig}</div>
-          <div className="w-[50%] ml-1">
+          <div className="w-[50%] pr-2 border-r border-gray-200">{orig}</div>
+          <div className="w-[50%] pl-2">
             <span className={index > cursor ? 'bg-gray-100 text-gray-100' : ''}>{trans}</span>
           </div>
         </div>
