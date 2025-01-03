@@ -28,7 +28,7 @@ function LangPrompt({ onSubmit }) {
 }
 
 export default function LangChat({ messages, onSubmit, generating }) {
-  return <div className="flex flex-col gap-4 px-2 py-4">
+  return <div className="flex flex-col h-full gap-4 px-2 py-4 overflow-y-auto">
     {messages.map(({role, content}, index) =>
       <LangMessage key={index} role={role}>
         <div className="markdown" dangerouslySetInnerHTML={{ __html: marked(content, {breaks: true}) }} />

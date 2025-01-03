@@ -4,6 +4,25 @@ import { useEffect, useRef } from 'react'
 
 export default function LangList({ chunks, cursor, setCursor }) {
   const listRefs = useRef([])
+  const boxRef = useRef(null)
+
+  // scroll to bottom
+  function scrollToBottom() {
+    const box = boxRef.current
+    box.scrollTo({
+      top: box.scrollHeight,
+      behavior: 'smooth',
+    })
+  }
+
+  // scroll to top
+  function scrollToTop() {
+    const box = boxRef.current
+    box.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    })
+  }
 
   // scroll to cursor
   useEffect(() => {
@@ -13,19 +32,22 @@ export default function LangList({ chunks, cursor, setCursor }) {
         block: 'nearest',
       })
     }
+    if (cursor >= chunks.length - 1) {
+      scrollToBottom()
+    } else if (cursor <= 0) {
+      scrollToTop()
+    }
   }, [cursor])
 
   // cursor navigation
   useEffect(() => {
     function handleKeyDown(e) {
       if (e.key === 'ArrowDown') {
-        console.log(cursor)
         if (cursor < chunks.length) {
           e.preventDefault()
           setCursor(c => c + 1)
         }
       } else if (e.key === 'ArrowUp') {
-        console.log(cursor)
         if (cursor > -1) {
           e.preventDefault()
           setCursor(c => c - 1)
@@ -37,7 +59,7 @@ export default function LangList({ chunks, cursor, setCursor }) {
   }, [chunks, cursor])
   
   return (
-    <div className="flex flex-col flex-1 w-full gap-2 p-2">
+    <div ref={boxRef} className="flex flex-col h-full w-full gap-2 p-2 overflow-y-scroll">
       {chunks.map(([orig, trans], index) => (
         <div
           key={index}
