@@ -1,9 +1,13 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import './App.css'
 
 import LangList from './LangList.jsx'
 import LangChat from './LangChat.jsx'
+import { useError } from './Error.jsx'
+import { LangButton, SvgIcon } from './Widgets.jsx'
 import { fetchTextStream, fetchJsonStream } from './utils.jsx'
+
+import eyeOpen from './icons/eye_open.svg'
 
 function App() {
   const [article, setArticle] = useState(null)
@@ -12,8 +16,36 @@ function App() {
   const [messages, setMessages] = useState([])
   const [translating, setTranslating] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [error, setError] = useState(null)
+  const [viewing, setViewing] = useState(false)
+  const [selected, setSelected] = useState(null);
   const inputRef = useRef(null)
+  const { showError } = useError()
+
+  // capture selection
+  useEffect(() => {
+    function handleSelection() {
+      const selection = window.getSelection()
+      const text = selection.toString().trim()
+      setSelected(text)
+    }
+    window.addEventListener('mouseup', handleSelection)
+    return () => window.removeEventListener('mouseup', handleSelection)
+  }, [])
+
+  // capture question mark
+  useEffect(() => {
+    function handleKeydown(event) {
+      if (event.target.tagName == 'TEXTAREA') return
+      if (event.key === '?') {
+        const question = selected ?
+          `What is the meaning of the phrase "${selected}"?` :
+          'What is the meaning of the current sentence?'
+        handleGenerate(question)
+      }
+    }
+    window.addEventListener('keydown', handleKeydown)
+    return () => window.removeEventListener('keydown', handleKeydown)
+  }, [selected])
 
   async function handleTranslate() {
     // get article url
@@ -41,7 +73,7 @@ function App() {
       }
     } catch (err) {
       console.error(err)
-      setError(err.message)
+      showError(err.message)
     }
 
     // reset button
@@ -88,7 +120,7 @@ function App() {
       }
     } catch (err) {
       console.error(err)
-      setError(err.message)
+      showError(err.message)
     }
 
     // show prompt
@@ -98,22 +130,20 @@ function App() {
   return (
     <div className="flex flex-row h-screen w-screen">
       <div className="flex flex-col flex-1 h-full">
-        <div className="relative flex flex-row border-b border-gray-300">
-          <input ref={inputRef} type="text" className="w-full p-2 outline-none font-mono bg-gray-100" placeholder="Enter article url" />
-          <div className="absolute right-0 h-full p-2">
-            <button className={`px-1 bg-blue-500 text-white h-full w-full rounded-sm font-bold text-sm ${translating ? 'opacity-50' : ''}`} disabled={translating} onClick={handleTranslate}>Translate</button>
-          </div>
+        <div className="relative flex flex-row gap-2 p-2 items-center border-b border-gray-300 bg-gray-100">
+          <input ref={inputRef} type="text" className="w-full outline-none font-mono bg-gray-100" placeholder="Enter article url" />
+          <LangButton onClick={() => setViewing(!viewing)} toggled={viewing}>
+            <SvgIcon svg={eyeOpen} size={4} />
+          </LangButton>
+          <button className={`px-1 bg-blue-500 text-white h-full rounded-sm font-bold text-sm ${translating ? 'opacity-50' : ''}`} disabled={translating} onClick={handleTranslate}>Translate</button>
         </div>
         <div className="flex-1 w-full min-h-0">
-          <LangList chunks={chunks} cursor={cursor} setCursor={setCursor} />
+          <LangList chunks={chunks} cursor={cursor} setCursor={setCursor} viewing={viewing} />
         </div>
       </div>
       <div className="w-[450px] h-full border-l border-gray-300 bg-gray-100">
-        {article && <LangChat messages={messages} onSubmit={handleGenerate} generating={generating} />}
+        <LangChat messages={messages} onSubmit={handleGenerate} generating={generating} active={article !== null} />
       </div>
-      {error && <div className="absolute bottom-5 right-5 w-[350px] border rounded border-gray-300 bg-gray-100 p-2 overflow-y-auto">
-        {error}
-      </div>}
     </div>
   )
 }
