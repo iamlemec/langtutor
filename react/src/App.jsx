@@ -37,6 +37,7 @@ function App() {
     function handleKeydown(event) {
       if (event.target.tagName == 'TEXTAREA') return
       if (event.key === '?') {
+        if (!selected && (cursor < 0 || cursor >= chunks.length)) return
         const question = selected ?
           `What is the meaning of the phrase "${selected}"?` :
           'What is the meaning of the current sentence?'
