@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 
-export default function LangList({ chunks, cursor, setCursor }) {
+export default function LangList({ chunks, cursor, setCursor, viewing }) {
   const listRefs = useRef([])
   const boxRef = useRef(null)
 
@@ -57,7 +57,7 @@ export default function LangList({ chunks, cursor, setCursor }) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [chunks, cursor])
-  
+
   return (
     <div ref={boxRef} className="flex flex-col h-full w-full gap-2 p-2 overflow-y-scroll">
       {chunks.map(([orig, trans], index) => (
@@ -69,7 +69,7 @@ export default function LangList({ chunks, cursor, setCursor }) {
         >
           <div className="w-[50%] pr-2 border-r border-gray-200">{orig}</div>
           <div className="w-[50%] pl-2">
-            <span className={index > cursor ? 'bg-gray-100 text-gray-100' : ''}>{trans}</span>
+            <span className={ viewing && index > cursor ? 'bg-gray-100 text-gray-100' : ''}>{trans}</span>
           </div>
         </div>
       ))}
