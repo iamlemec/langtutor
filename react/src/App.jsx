@@ -10,6 +10,7 @@ function App() {
   const [chunks, setChunks] = useState([])
   const [cursor, setCursor] = useState(-1)
   const [messages, setMessages] = useState([])
+  const [translating, setTranslating] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState(null)
   const inputRef = useRef(null)
@@ -24,6 +25,7 @@ function App() {
     setMessages([])
     setChunks([])
     setCursor(-1)
+    setTranslating(true)
 
     try {
       // stream in chunks
@@ -41,6 +43,9 @@ function App() {
       console.error(err)
       setError(err.message)
     }
+
+    // reset button
+    setTranslating(false)
   }
 
   function getContext() {
@@ -93,17 +98,17 @@ function App() {
   return (
     <div className="flex flex-row h-screen w-screen">
       <div className="flex flex-col flex-1 h-full">
-        <div className="relative flex flex-row border-b border-gray-200">
+        <div className="relative flex flex-row border-b border-gray-300">
           <input ref={inputRef} type="text" className="w-full p-2 outline-none font-mono bg-gray-100" placeholder="Enter article url" />
           <div className="absolute right-0 h-full p-2">
-            <button className="px-1 bg-blue-500 text-white h-full w-full rounded font-bold text-sm" onClick={handleTranslate}>Translate</button>
+            <button className={`px-1 bg-blue-500 text-white h-full w-full rounded-sm font-bold text-sm ${translating ? 'opacity-50' : ''}`} disabled={translating} onClick={handleTranslate}>Translate</button>
           </div>
         </div>
         <div className="flex-1 w-full min-h-0">
           <LangList chunks={chunks} cursor={cursor} setCursor={setCursor} />
         </div>
       </div>
-      <div className="w-[450px] h-full border-l border-gray-200">
+      <div className="w-[450px] h-full border-l border-gray-300 bg-gray-100">
         {article && <LangChat messages={messages} onSubmit={handleGenerate} generating={generating} />}
       </div>
       {error && <div className="absolute bottom-5 right-5 w-[350px] border rounded border-gray-300 bg-gray-100 p-2 overflow-y-auto">
