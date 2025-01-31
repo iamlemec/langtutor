@@ -184,7 +184,7 @@ def LangTutor(**kwargs):
 
 # parse args
 parser = argparse.ArgumentParser()
-parser.add_argument('--provider', type=str, default='local')
+parser.add_argument('--provider', type=str, default='anthropic')
 parser.add_argument('--native', action='store_true')
 parser.add_argument('--model', type=str, default=None)
 parser.add_argument('--prefill', default=True, action=argparse.BooleanOptionalAction)
