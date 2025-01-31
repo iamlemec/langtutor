@@ -95,7 +95,7 @@ async def extract_text(url):
     # fetch and extract
     print(f'Fetching text')
     proc = await asyncio.create_subprocess_exec(
-        'node', '../readability/index.js', url,
+        'node', 'readability/index.js', url,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )
