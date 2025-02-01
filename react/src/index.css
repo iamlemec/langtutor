@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+
+/*
+ * scrollbar
+ */
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+      display: none;
+  }
+
+  .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+  }
+}
+
+/*
+ * small caps
+ */
+
 .small-caps {
   font-variant: small-caps;
 }

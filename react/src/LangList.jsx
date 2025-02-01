@@ -59,7 +59,7 @@ export default function LangList({ chunks, cursor, setCursor, viewing }) {
   }, [chunks, cursor])
 
   return (
-    <div ref={boxRef} className="flex flex-col h-full w-full gap-2 p-2 overflow-y-scroll">
+    <div ref={boxRef} className="flex flex-col h-full w-full gap-2 p-2 overflow-y-scroll no-scrollbar">
       {chunks.map(([orig, trans], index) => (
         <div
           key={index}

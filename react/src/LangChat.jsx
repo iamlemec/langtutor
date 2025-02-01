@@ -46,8 +46,17 @@ function LangMessage({ role, content }) {
 }
 
 export default function LangChat({ messages, onSubmit, generating, active }) {
+  const boxRef = useRef(null)
+
+  // scroll to bottom whenever text changes
+  useEffect(() => {
+    if (boxRef.current) {
+      boxRef.current.scrollTop = boxRef.current.scrollHeight;
+    }
+  }, [messages, generating]);
+
   const content = active ? 'Ask me anything about this article.' : 'Enter a URL and click "Translate" to start.'
-  return <div className="flex flex-col h-full gap-4 px-2 py-4 overflow-y-auto">
+  return <div ref={boxRef} className="flex flex-col h-full gap-4 px-2 pt-4 pb-2 overflow-y-auto no-scrollbar">
     <LangMessage role="system" content={content} />
     {messages.map(({role, content}, index) =>
       <LangMessage key={index} role={role} content={content} />
