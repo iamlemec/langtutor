@@ -17,36 +17,8 @@ function App() {
   const [translating, setTranslating] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [viewing, setViewing] = useState(false)
-  const [selected, setSelected] = useState(null);
   const inputRef = useRef(null)
   const { showError } = useError()
-
-  // capture selection
-  useEffect(() => {
-    function handleSelection() {
-      const selection = window.getSelection()
-      const text = selection.toString().trim()
-      setSelected(text)
-    }
-    window.addEventListener('mouseup', handleSelection)
-    return () => window.removeEventListener('mouseup', handleSelection)
-  }, [])
-
-  // capture question mark
-  useEffect(() => {
-    function handleKeydown(event) {
-      if (event.target.tagName == 'TEXTAREA') return
-      if (event.key === '?') {
-        if (!selected && (cursor < 0 || cursor >= chunks.length)) return
-        const question = selected ?
-          `What is the meaning of the phrase "${selected}"?` :
-          'What is the meaning of the current sentence?'
-        handleGenerate(question)
-      }
-    }
-    window.addEventListener('keydown', handleKeydown)
-    return () => window.removeEventListener('keydown', handleKeydown)
-  }, [selected, cursor])
 
   async function handleTranslate() {
     // get article url
@@ -139,7 +111,7 @@ function App() {
           <button className={`px-1 bg-blue-500 text-white h-full rounded-sm font-bold text-sm ${translating ? 'opacity-50' : ''}`} disabled={translating} onClick={handleTranslate}>Translate</button>
         </div>
         <div className="flex-1 w-full min-h-0">
-          <LangList chunks={chunks} cursor={cursor} setCursor={setCursor} viewing={viewing} />
+          <LangList chunks={chunks} cursor={cursor} setCursor={setCursor} viewing={viewing} handleGenerate={handleGenerate} />
         </div>
       </div>
       <div className="w-[450px] h-full border-l border-gray-300 bg-gray-100">

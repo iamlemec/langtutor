@@ -1,10 +1,19 @@
 // TransList component
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-export default function LangList({ chunks, cursor, setCursor, viewing }) {
+function LangTooltip({ position, onMouseDown }) {
+  return <div className="absolute flex w-6 h-6 bg-gray-100 border border-gray-400 rounded p-1 items-center justify-center cursor-default hover:bg-gray-300" style={{ left: position.x, top: position.y }} onMouseDown={onMouseDown}>
+    <span className="font-bold">?</span>
+  </div>
+}
+
+export default function LangList({ chunks, cursor, setCursor, viewing, handleGenerate }) {
   const listRefs = useRef([])
   const boxRef = useRef(null)
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const timeoutRef = useRef(null)
 
   // scroll to bottom
   function scrollToBottom() {
@@ -58,8 +67,59 @@ export default function LangList({ chunks, cursor, setCursor, viewing }) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [chunks, cursor])
 
+  // show tooltip on selection
+  function handleMouseUp(event) {
+    // clear timeout if it exists
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+
+    // possibly show the tooltip after 100ms
+    timeoutRef.current = setTimeout(() => {
+      const selected = window.getSelection();
+      const text = selected ? selected.toString().trim() : null
+      if (text && text.length > 0) {
+        const range = selected.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        setPosition({
+          x: rect.left + rect.width - 24,
+          y: rect.bottom + 5
+        });
+        setShowTooltip(true);
+      } else {
+        setShowTooltip(false);
+      }
+    }, 100);
+  }
+
+  // close tooltip when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (!boxRef.current.contains(event.target)) {
+        setShowTooltip(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, []);
+
+  // send question query
+  function handleQuestion(event) {
+    const selected = window.getSelection();
+    const text = selected ? selected.toString().trim() : null
+    console.log('handleQuestion', text)
+    if (!text) return
+    const question = `What is the meaning of the phrase "${text}"?`
+    handleGenerate(question)
+  }
+
   return (
-    <div ref={boxRef} className="flex flex-col h-full w-full gap-2 p-2 overflow-y-scroll no-scrollbar">
+    <div ref={boxRef} className="flex flex-col h-full w-full gap-2 p-2 overflow-y-scroll no-scrollbar" onMouseUp={handleMouseUp}>
       {chunks.map(([orig, trans], index) => (
         <div
           key={index}
@@ -73,6 +133,7 @@ export default function LangList({ chunks, cursor, setCursor, viewing }) {
           </div>
         </div>
       ))}
+      {showTooltip && <LangTooltip position={position} onMouseDown={handleQuestion} />}
     </div>
   )
 }
